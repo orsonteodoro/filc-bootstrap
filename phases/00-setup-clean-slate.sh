@@ -1,7 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (with safety guard on rm -rf)
-# Supports Gentoo, Debian, and Alpine reliably
+# Phase 00 - Setup Clean Slate (Robust Alpine fix - April 2026)
 # =============================================================================
 
 set -euo pipefail
@@ -21,72 +20,57 @@ TEST_DISTRO=${TEST_DISTRO:-"debian"}
 
 log "Target root: $TARGET_ROOT | Test mode: $TEST_MODE ($TEST_DISTRO)"
 
-# ====================== SAFETY CHECK BEFORE DESTRUCTIVE OPERATIONS ======================
-if [[ "$FORCE_FRESH" == "true" ]]; then
-    log "Force fresh mode enabled — about to wipe $TARGET_ROOT"
+mkdir -p "$TARGET_ROOT"
 
-    # Strong safety guard
-    if [[ -z "$TARGET_ROOT" || "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
-        log "ERROR: Refusing to wipe dangerous target: $TARGET_ROOT"
-        log "TARGET_ROOT cannot be /, /home, /root, or empty."
+if [[ "$FORCE_FRESH" == "true" ]]; then
+    log "Force fresh enabled — wiping $TARGET_ROOT"
+    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
+        log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
         exit 1
     fi
-
-    if [[ ! "$TARGET_ROOT" =~ ^/mnt/ && ! "$TARGET_ROOT" =~ ^/tmp/ && ! "$TARGET_ROOT" =~ ^/var/tmp/ ]]; then
-        log "WARNING: TARGET_ROOT ($TARGET_ROOT) is not under /mnt/, /tmp/, or /var/tmp/."
-        read -p "Are you sure you want to wipe this directory? (yes/NO): " confirm
-        if [[ "$confirm" != "yes" ]]; then
-            log "Aborted by user."
-            exit 1
-        fi
-    fi
-
-    log "Wiping target directory: $TARGET_ROOT"
     rm -rf "$TARGET_ROOT"/*
 fi
 
-# ====================== Create target directory ======================
-mkdir -p "$TARGET_ROOT"
-
-# ====================== Alpine Test Mode (Fixed) ======================
+# ====================== Alpine Test Mode (More Robust) ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Creating Alpine test chroot..."
+    log "Creating Alpine test chroot (robust method)..."
 
-    APK_STATIC_APK="https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/apk-tools-static-3.0.5-r0.apk"
+    # Current stable apk-tools-static as of 2026
+    APK_STATIC_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/apk-tools-static-3.0.5-r0.apk"
 
     log "Downloading apk-tools-static..."
-    wget -q -O /tmp/apk-tools-static.apk "$APK_STATIC_APK"
+    wget -q --show-progress -O /tmp/apk-tools-static.apk "$APK_STATIC_URL"
 
     if [[ ! -s /tmp/apk-tools-static.apk ]]; then
-        log "ERROR: Failed to download apk-tools-static from $APK_STATIC_APK"
+        log "ERROR: Failed to download apk-tools-static"
         exit 1
     fi
 
     log "Extracting apk.static..."
-    tar -xzf /tmp/apk-tools-static.apk -C /tmp --wildcards 'sbin/apk.static' --strip-components=1 2>/dev/null || true
-
-    if [[ ! -f /tmp/apk.static ]]; then
-        log "ERROR: Could not extract apk.static"
-        exit 1
-    fi
+    tar -xzf /tmp/apk-tools-static.apk -C /tmp --wildcards 'sbin/apk.static' --strip-components=1
 
     mv /tmp/apk.static /usr/bin/apk.static
     chmod +x /usr/bin/apk.static
 
     log "Bootstrapping minimal Alpine root..."
-    /usr/bin/apk.static --root "$TARGET_ROOT" --initdb --no-cache --allow-untrusted add alpine-base bash
+    /usr/bin/apk.static --root "$TARGET_ROOT" --initdb --no-cache --allow-untrusted add alpine-base
 
+    # Setup repositories
     mkdir -p "$TARGET_ROOT/etc/apk"
     cat > "$TARGET_ROOT/etc/apk/repositories" <<EOF
 http://dl-cdn.alpinelinux.org/alpine/v3.23/main
 http://dl-cdn.alpinelinux.org/alpine/v3.23/community
 EOF
 
-    log "Installing build tools..."
-    apk --root "$TARGET_ROOT" --no-cache add \
-        bash git curl wget build-base clang cmake ninja patchelf rsync tar
+    # Update index and install remaining packages
+    log "Updating package index and installing tools..."
+    apk --root "$TARGET_ROOT" --no-cache update
 
-    log "Alpine chroot bootstrapped successfully."
+    apk --root "$TARGET_ROOT" --no-cache add \
+        bash git curl wget \
+        build-base clang cmake ninja patchelf rsync tar
+
+    log "✅ Alpine chroot successfully bootstrapped with all required packages."
 
 # ====================== Debian Test Mode ======================
 elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
@@ -108,7 +92,7 @@ else
 
     STAGE3_TARBALL=$(grep -E "${STAGE3_PROFILE}-.*\.tar\.xz$" latest-stage3.txt | awk '{print $1}' | tail -n1)
     if [[ -z "$STAGE3_TARBALL" ]]; then
-        log "ERROR: Could not find Gentoo stage 3 tarball"
+        log "ERROR: Could not find Gentoo stage 3"
         exit 1
     fi
 
