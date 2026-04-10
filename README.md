@@ -1,77 +1,120 @@
 # filc-bootstrap
 
-**Distro-agnostic bootstrap for Fil-C** — the memory-safe C/C++ compiler.
+**Distro-agnostic bootstrap for Fil-C** — memory-safe C/C++ compiler.
 
-This repository contains the reusable scripts and logic needed to inject Fil-C into a minimal Linux chroot (including a vanilla Gentoo stage 3).
+This repository provides reusable scripts to inject Fil-C into a clean environment.
 
-### Goal
+### Features
 
-Turn a normal (Yolo-C) base system into a **pizlonated** environment where:
-- The Fil-C compiler (`filcc` / `fil++`) and runtime (`libpizlo.so`) are installed.
-- A **dual-libc sandwich** is created (Yolo glibc + User glibc compiled with Fil-C).
-- New compilations produce memory-safe binaries by default.
+- Supports **clean Gentoo stage 3** (recommended for real builds)
+- Supports **fast test mode** with Debian or Alpine chroots (ideal for script validation)
+- Modular phases with checkpoints and recovery support
+- Automatic DNS handling and safety snapshots
 
-### Bootstrap Levels (Fil-C / Pizlix style)
+### Backstory
 
-The process is divided into three conceptual phases (adapted for reusability and Gentoo):
+Fil-C is a personal project by **Filip Pizlo** (senior director of language engineering at Epic Games, previously worked on JavaScriptCore and WebKit). 
 
-- **Pre-LC (Stage 1 equivalent)**  
-  Prepare the base environment, install build dependencies, clone Fil-C, and build the Fil-C toolchain + runtime.
+Frustrated with the endless stream of memory safety vulnerabilities in large C/C++ codebases, Pizlo created Fil-C with the core philosophy: **"Garbage In, Memory Safety Out"** — take mostly unmodified existing C/C++ code, compile it with Fil-C, and get strong memory safety automatically.
 
-- **LC (Stage 2 equivalent — the critical transition)**  
-  This is the heart of the bootstrap.  
-  - Build **Yolo glibc** (normal unsafe) for the runtime.  
-  - "Yoloify" critical binaries (`patchelf`).  
-  - Build **User glibc** with Fil-C (memory-safe).  
-  - Install the Fil-C compiler and switch the environment so new builds use the safe libc.  
+It combines **invisible capabilities** (InvisiCaps) with a high-performance concurrent garbage collector. The project also includes **Pizlix**, a memory-safe Linux distribution built on top of it.
 
-- **Post-LC hand-off**  
-  After LC succeeds, control is handed over to the Distro-specific package repository.
-  For Gentoo (`pilc-overlay`), it continues the system install for both `@system` and `@world`.
+### Important Warning: Experimental Status
 
-### Purpose
+> **⚠️ Fil-C is still highly experimental (as of 2026)**
 
-- Provide **reusable, idempotent, and recoverable** bash scripts (with optional Python helpers).
-- Support incremental updates to the Fil-C toolchain without always starting from a fresh stage 3.
-- Be as distro-agnostic as possible so the same core logic can work on Gentoo, Debian chroots, Alpine, LFS, etc.
-- Make checkpoints and recovery easy (snapshots, `.done` files, `--recover-lc`, `--update-filc` flags).
+- **Code quality**: Large portions of the Fil-C codebase, build system, and libc patches are research-grade and evolve quickly. Expect rough edges, incomplete documentation, and occasional breaking changes.
+- **Adoption**: Very low. Primarily used by enthusiasts and researchers. It has **not** been widely tested in production.
+- **Compatibility**: While the goal is high compatibility, many real-world packages still require patches.
+
+**Use this bootstrap at your own risk.** Excellent for learning and experimentation, but **not recommended for production systems** yet.
+
+### Compatibility of Fil-C Built Packages
+
+Fil-C produces **ABI-incompatible** binaries due to its dual-libc architecture and runtime requirements:
+
+- **Fil-C compiled packages** cannot directly use prebuilt binaries from existing distributions (Ubuntu, Debian, Fedora, Arch, Gentoo, etc.).
+- You must rebuild **almost the entire userland** with Fil-C (this is what the LC + Post-LC phases do).
+- Some libraries and binaries may need patches or special build flags.
+- **Dynamic linking** to normal (Yolo-C) libraries is limited and often requires the "yoloify" step or wrapper mechanisms.
+- **Prebuilt binaries** from mainstream distros generally **will not run** (or will run unsafely) on a fully pizlonated Fil-C system.
+
+In short: Once you go full Fil-C, you are mostly on your own for the package ecosystem.
+
+### Estimated Impacts
+
+| Aspect                  | Estimated Impact                                      | Notes |
+|-------------------------|-------------------------------------------------------|-------|
+| **Performance**         | **1.5× – 4× slower** (typical)<br>Some code closer to 1.2× | Due to bounds checking, garbage collection, and runtime metadata. Heavy pointer-heavy code suffers more. |
+| **Memory Usage**        | **20% – 80% higher**                                  | Garbage collector + capability metadata overhead. |
+| **Security**            | **Very high improvement**                             | Catches spatial + temporal memory safety bugs at runtime with deterministic panics instead of silent exploits. |
+| **Binary Size**         | **10% – 50% larger**                                  | Extra runtime metadata and checks. |
+| **Build Time**          | **2× – 5× longer**                                    | Especially during the initial full rebuild. |
+
+**Security Benefit**: Fil-C eliminates entire classes of memory corruption vulnerabilities (buffer overflows, use-after-free, etc.) that are responsible for the majority of high-severity CVEs in C/C++ software.
+
+### Fil-C vs CHERI
+
+| Aspect                  | Fil-C                                      | CHERI                                          |
+|-------------------------|--------------------------------------------|------------------------------------------------|
+| **Implementation**      | Pure software (stock x86_64)               | Hardware capabilities (new CPU required)       |
+| **Pointer size**        | Unchanged (64-bit)                         | Wider (≥128-bit capabilities)                  |
+| **Compatibility**       | Very high                                  | Good, but often requires changes               |
+| **Temporal safety**     | Strong (precise concurrent GC)             | Weaker (depends on revocation)                 |
+| **Deployment**          | Works today on existing hardware           | Requires new hardware or emulation             |
+| **Performance overhead**| Moderate to high (1.5–4×)                  | Very low (~2–5%)                               |
+
+### Quick Start
+
+**Fast testing (recommended first):**
+```bash
+./bootstrap.sh --test          # Uses Debian by default
+# or
+./bootstrap.sh --test-alpine
+
+### Real Gentoo build:
+
+./bootstrap.sh --clean-slate
+
+#### Other useful flags:--fresh — Ignore checkpoints and start over
+* --update-filc — Only rebuild Fil-C toolchain
+* --recover-lc — Recover only the LC phase
+
+#### Bootstrap PhasesPhase 00: Create clean chroot (Gentoo stage 3 / Debian / Alpine)
+- Phase 01: Prepare base environment + dependencies
+- Phase 02: Build Fil-C toolchain (build_all_fast_glibc.sh)
+- Phase 03: Dual-libc LC transition (yolo + user glibc)
+- Phase 03.5: Hello World test (critical safety check)
+- Phase 04: Gentoo bridge + hand-off to filc-overlay (or your distro's overlay)
 
 ### Default Language Standards (Fil-C)
 
-Fil-C is based on **Clang 20.1.8** and uses modern, strict defaults:
+* C: -std=c17 (ISO C17) — GNU extensions not enabled by default
+* C++: -std=c++20 (ISO C++20) — GNU extensions not enabled by default
 
-- **C**: `-std=c17` (ISO C17) by default — **not** `gnu17`
-- **C++**: `-std=c++20` (ISO C++20) by default — **not** `gnu++20`
+You will typically need -std=gnu17 and -std=gnu++20 in make.conf for Gentoo packages.
 
-**GNU extensions are NOT enabled by default.**  
-Many packages will need `-std=gnu17` (C) or `-std=gnu++20` (C++) added via `make.conf` or per-package flags.
-
-### Default Bootstrap Language
-
-- **Primary**: Bash (for maximum portability and alignment with existing Fil-C / Pizlix scripts).
-- **Optional helpers**: Python (for complex logic such as emerge parsing, patch management, or structured logging).
-
-The bootstrap itself will eventually be compilable with Fil-C for full memory safety.
-
-### Repository Structure (planned)
+### Repository Structure
 
 ```
 filc-bootstrap/
 ├── bootstrap.sh
 ├── config.sh
 ├── phases/
+│   ├── 00-setup-clean-slate.sh
 │   ├── 01-prepare-base.sh
 │   ├── 02-build-filc-toolchain.sh
-│   ├── 03-setup-dual-libc.sh      # LC phase (most complex)
+│   ├── 03-setup-dual-libc.sh
+│   ├── 03.5-test-hello-world.sh
 │   └── 04-gentoo-bridge.sh
 ├── utils/
 ├── patches/
-└── docs/
+└── logs/
 ```
-
-See the `phases/` and `utils/` directories for detailed documentation.
 
 ---
 
-**Status**: Early planning / initial scripts  
-**Related repo**: [filc-overlay](https://github.com/orsonteodoro/filc-overlay) (Ebuild overlay + Post-LC rebuild)
+Related repository: [filc-overlay](https://github.com/orsonteodoro/filc-overlay) — Gentoo ebuilds and Post-LC integration.
+Status: In active development, testing phase
+
+---
