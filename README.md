@@ -4,6 +4,18 @@
 
 This repository provides reusable scripts to inject Fil-C into a clean environment.
 
+### Important Safety Warning
+
+> **⚠️ This bootstrap is experimental and potentially destructive.**
+
+Fil-C is still in active research/development. The LC phase (dual-libc transition) modifies critical system binaries and libraries using `patchelf`.  
+A failed or interrupted LC phase can leave the chroot in a broken state.
+
+**Strongly Recommended:**
+- Always run this bootstrap inside a **virtual machine** (KVM, VirtualBox, VMware, QEMU, etc.) for the first several attempts.
+- Take **snapshots** of the VM before starting Phase 03 (LC transition).
+- Never run this directly on your main/host system.
+
 ### Features
 
 - Supports **clean Gentoo stage 3** (recommended for real builds)
