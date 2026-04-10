@@ -1,0 +1,62 @@
+# Instructions for creating a VM for testing bootstraping before the expensive gentoo bootstrapping.
+
+mkdir -p ~/qemu-alpine
+cd ~/qemu-alpine
+wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso
+
+cd ~/qemu-alpine
+qemu-img create -f qcow2 alpine.qcow2 20G
+
+# Contents of ~/qemu-alpine/setup.sh:
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 4096 \
+  -cpu host \
+  -smp 4 \
+  -nic user,model=virtio \
+  -drive file=alpine.qcow2,format=qcow2,if=virtio \
+  -cdrom alpine-standard-3.23.0-x86_64.iso \
+  -boot once=d \
+  -display gtk \
+  -vga virtio
+chmod +x ~/qemu-alpine/setup.sh
+./setup.sh
+
+# In alpine:
+setup-alpine
+# root - no password
+# Keyboard layout → usually us
+# Hostname → anything (e.g. filc-test)
+# Networking → use DHCP (default is fine)
+# Disk → choose sda (or vda), use sys mode (full disk install)
+
+# Shutdown vm
+
+# contents of ~/qemu-alpine/setup2.sh:
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 4096 \
+  -cpu host \
+  -smp 4 \
+  -nic user,model=virtio \
+  -drive file=alpine.qcow2,format=qcow2,if=virtio \
+  -display gtk \
+  -vga virtio
+chmod +x ~/qemu-alpine/setup2.sh
+./setup2.sh
+
+# Update and install basic tools
+apk update
+apk add git bash curl wget build-base clang cmake ninja patchelf
+
+# Create a working directory
+mkdir -p ~/filc-test
+cd ~/filc-test
+
+# Copy your filc-bootstrap repo into the VM
+# (easiest way: use scp from host, or git clone inside)
+git clone https://github.com/orsonteodoro/filc-bootstrap.git
+cd filc-bootstrap
+
+chmod +x ./setup-alpine-guest-filc-test.sh
+./setup-alpine-guest-filc-test.sh
