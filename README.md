@@ -100,7 +100,7 @@ In short: Once you go full Fil-C, you are mostly on your own for the package eco
 - Phase 02: Build Fil-C toolchain (build_all_fast_glibc.sh)
 - Phase 03: Dual-libc LC transition (yolo + user glibc)
 - Phase 03.5: Hello World test (critical safety check)
-- Phase 04: Gentoo bridge + hand-off to filc-overlay (or your distro's overlay)
+- Phase 04: Gentoo bridge + hand-off to filc-overlay (or your distro's main package repo/overlay)
 
 ### Default Language Standards (Fil-C)
 
