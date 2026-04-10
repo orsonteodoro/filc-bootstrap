@@ -11,7 +11,7 @@ This repository provides reusable scripts to inject Fil-C into a clean environme
 - Modular phases with checkpoints and recovery support
 - Automatic DNS handling and safety snapshots
 
-### Backstory
+### Fil-C Backstory
 
 Fil-C is a personal project by **Filip Pizlo** (senior director of language engineering at Epic Games, previously worked on JavaScriptCore and WebKit). 
 
@@ -66,15 +66,18 @@ In short: Once you go full Fil-C, you are mostly on your own for the package eco
 
 ### Quick Start
 
-**Fast testing (recommended first):**
+*** Fast testing (recommended first): ***
 ```bash
 ./bootstrap.sh --test          # Uses Debian by default
 # or
 ./bootstrap.sh --test-alpine
+```
 
-### Real Gentoo build:
+#### Real Gentoo build:
 
+```bash
 ./bootstrap.sh --clean-slate
+```
 
 #### Other useful flags:--fresh — Ignore checkpoints and start over
 * --update-filc — Only rebuild Fil-C toolchain
@@ -114,7 +117,7 @@ filc-bootstrap/
 
 ---
 
-Related repository: [filc-overlay](https://github.com/orsonteodoro/filc-overlay) — Gentoo ebuilds and Post-LC integration.
-Status: In active development, testing phase
+* Related repository: [filc-overlay](https://github.com/orsonteodoro/filc-overlay) — Gentoo ebuilds and Post-LC integration.
+* Status: In active development, testing phase
 
 ---
