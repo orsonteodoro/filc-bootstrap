@@ -74,4 +74,4 @@ See the `phases/` and `utils/` directories for detailed documentation.
 ---
 
 **Status**: Early planning / initial scripts  
-**Related repo**: [filc-gentoo](https://github.com/orsonteodoro/filc-overlay) (Ebuild overlay + Post-LC rebuild)
+**Related repo**: [filc-overlay](https://github.com/orsonteodoro/filc-overlay) (Ebuild overlay + Post-LC rebuild)
