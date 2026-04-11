@@ -51,9 +51,16 @@ export SKIP_GENTOO_BRIDGE=false
 # Force flags
 export FORCE_FRESH=${FORCE_FRESH:-false}
 
+# ====================== Git Optimization ======================
+# Disable shallow clone when using a pinned commit or tag
+if [[ -n "$FILC_COMMIT" || "$FILC_USE_TAG" == "true" ]]; then
+    export GIT_SHALLOW=false
+else
+    export GIT_SHALLOW=true
+fi
+
 # ====================== Git Cache for Reproducibility ======================
-# Use shallow clone + shared cache for faster, more hermetic repeats
-#export GIT_SHALLOW=true # May break
+export GIT_SHALLOW=true # May break
 export GIT_CACHE_DIR="${GIT_CACHE_DIR:-$HOME/.cache/filc-git-cache}"
 mkdir -p "$GIT_CACHE_DIR"
 

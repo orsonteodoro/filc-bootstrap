@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 01 - Prepare Base Environment (with git progress + cache)
+# Phase 01 - Prepare Base Environment (Improved git + cache handling)
 # =============================================================================
 
 set -euo pipefail
@@ -14,39 +14,65 @@ log() {
 
 log "Starting Phase 01: Prepare Base Environment"
 
-# Ensure scripts are in place
-cd /root/filc-bootstrap || {
+# Ensure we are in the correct location inside chroot
+if [[ ! -d /root/filc-bootstrap ]]; then
+    log "Copying bootstrap scripts into chroot..."
     mkdir -p /root/filc-bootstrap
-    cp -a "$SCRIPT_DIR"/.. /root/filc-bootstrap/
-    cd /root/filc-bootstrap
-}
+    cp -a "$SCRIPT_DIR"/.. /root/filc-bootstrap/ 2>/dev/null || true
+fi
+cd /root/filc-bootstrap
 
-# ====================== Git Cache Setup (for faster repeats) ======================
+# ====================== Distro Detection ======================
+if [[ -f /etc/gentoo-release ]]; then
+    DISTRO="gentoo"
+    log "Detected Gentoo"
+elif [[ -f /etc/alpine-release ]]; then
+    DISTRO="alpine"
+    log "Detected Alpine"
+else
+    DISTRO="unknown"
+    log "WARNING: Unknown distribution"
+fi
+
+# ====================== DNS Check ======================
+log "Verifying DNS resolution..."
+if ! ping -c 1 -W 5 -q google.com >/dev/null 2>&1; then
+    log "DNS failed. Applying fallback public DNS..."
+    cat > /etc/resolv.conf <<EOF
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+    chmod 644 /etc/resolv.conf
+fi
+log "DNS is working."
+
+# ====================== Git Cache Setup ======================
 mkdir -p "$GIT_CACHE_DIR"
 
-# ====================== Clone / Update Fil-C (with cache) ======================
+# ====================== Clone / Update Fil-C (with cache + pinned commit support) ======================
 log "Setting up Fil-C source at $FILC_SOURCE_DIR"
 
-# Use git cache to avoid re-downloading on every fresh run
-if [[ ! -d "$FILC_SOURCE_DIR/.git" ]]; then
-    log "Cloning Fil-C (using cache if available)..."
-
-    mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
-
-    if [[ -d "$GIT_CACHE_DIR/fil-c.git" ]]; then
-        log "Using existing git cache at $GIT_CACHE_DIR/fil-c.git"
-        git clone --reference "$GIT_CACHE_DIR/fil-c.git" --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
-    else
-        git clone --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
-        # Create cache for future runs
-        cp -a "$FILC_SOURCE_DIR/.git" "$GIT_CACHE_DIR/fil-c.git" 2>/dev/null || true
-    fi
-
-    cd "$FILC_SOURCE_DIR"
-else
+if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
     log "Updating existing Fil-C repository..."
     cd "$FILC_SOURCE_DIR"
     git fetch --progress origin
+else
+    log "Cloning Fil-C repository..."
+    mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
+
+    if [[ -d "$GIT_CACHE_DIR/fil-c.git" ]]; then
+        log "Using git cache for faster clone..."
+        git clone --reference "$GIT_CACHE_DIR/fil-c.git" --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
+    else
+        if [[ "$GIT_SHALLOW" == "true" && -z "$FILC_COMMIT" && "$FILC_USE_TAG" != "true" ]]; then
+            git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
+        else
+            git clone --progress --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
+        fi
+        # Create cache for future runs
+        cp -a "$FILC_SOURCE_DIR/.git" "$GIT_CACHE_DIR/fil-c.git" 2>/dev/null || true
+    fi
+    cd "$FILC_SOURCE_DIR"
 fi
 
 # Checkout logic
@@ -58,13 +84,19 @@ if [[ "$FILC_USE_TAG" == "true" && -n "$FILC_TAG" ]]; then
     git checkout "$FILC_TAG" || log "WARNING: Tag $FILC_TAG not found"
 elif [[ -n "$FILC_COMMIT" ]]; then
     log "Pinning to commit: $FILC_COMMIT"
-    git fetch origin "$FILC_COMMIT" || true
-    git checkout "$FILC_COMMIT" || log "WARNING: Commit $FILC_COMMIT not found, staying on branch tip"
+    if git cat-file -e "$FILC_COMMIT" 2>/dev/null; then
+        git checkout "$FILC_COMMIT"
+    else
+        log "Fetching specific commit..."
+        git fetch origin "$FILC_COMMIT"
+        git checkout "$FILC_COMMIT"
+    fi
+    log "Successfully checked out commit $FILC_COMMIT"
 fi
 
 # Final verification with recovery
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "WARNING: build scripts not found. Resetting to branch tip..."
+    log "WARNING: build scripts not found after checkout. Resetting to branch tip..."
     git checkout "$FILC_BRANCH"
     git pull --ff-only --progress || true
 fi
@@ -79,20 +111,32 @@ fi
 log "Fil-C source ready."
 log "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
 
-# ====================== Rest of Phase 01 (dependencies) ======================
+# ====================== Install Dependencies ======================
 log "Installing build dependencies..."
 
-if [[ -f /etc/alpine-release ]]; then
+if [[ "$DISTRO" == "alpine" ]]; then
     apk add --no-cache \
         bash git curl wget ca-certificates \
         build-base clang clang-dev llvm llvm-dev \
         cmake ninja patchelf rsync tar
-elif [[ -f /etc/gentoo-release ]]; then
+elif [[ "$DISTRO" == "gentoo" ]]; then
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
     emerge -av --noreplace git clang llvm cmake ninja patchelf quilt rsync tar wget curl
 fi
 
+log "Build dependencies installed."
+
+# ====================== Snapshot ======================
+if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
+    SNAPSHOT_NAME="${SNAPSHOT_PREFIX}-post-phase01-$(date '+%Y%m%d-%H%M%S').tar.gz"
+    log "Creating post-phase01 snapshot..."
+    mkdir -p "$BACKUP_DIR"
+    tar -czf "$BACKUP_DIR/$SNAPSHOT_NAME" \
+        --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run --exclude=/tmp \
+        /bin /usr/bin /lib /usr/lib /etc 2>/dev/null || true
+fi
+
 log "Phase 01 completed successfully!"
-log "Ready for Phase 02 (Fil-C build)."
+log "Ready for Phase 02: Building Fil-C toolchain."
 
 exit 0
