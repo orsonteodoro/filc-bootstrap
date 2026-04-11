@@ -14,7 +14,7 @@ export FILC_BRANCH="deluge"
 # For system-wide / daily use:
 #   Use "latest" or a recent stable tag if available.
 export FILC_COMMIT=""                                          # Leave empty for latest on branch
-export FILC_COMMIT="d8f3c2a1b9e7f5d6c4b8a2e1f9d7c6b5a4e3f2d1"  # Recent tested commit
+export FILC_COMMIT="39ee664dbf0b7db841ae05269201e757447290ee"  # Recent commit in deluge branch
 export FILC_TAG="v0.678"
 #export FILC_COMMIT="39ee664dbf0b7db841ae05269201e757447290ee" # deluge snapshot, Mar 27, 2026, LLVM 20.1.8
 export FILC_USE_TAG=false                                      # Set to true if using FILC_TAG
