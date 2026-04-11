@@ -24,47 +24,53 @@ cd /root/filc-bootstrap || {
 # ====================== Git Cache Setup (for faster repeats) ======================
 mkdir -p "$GIT_CACHE_DIR"
 
-# ====================== Clone / Update Fil-C ======================
+# ====================== Clone / Update Fil-C (with cache) ======================
 log "Setting up Fil-C source at $FILC_SOURCE_DIR"
 
-if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
+# Use git cache to avoid re-downloading on every fresh run
+if [[ ! -d "$FILC_SOURCE_DIR/.git" ]]; then
+    log "Cloning Fil-C (using cache if available)..."
+
+    mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
+
+    if [[ -d "$GIT_CACHE_DIR/fil-c.git" ]]; then
+        log "Using existing git cache at $GIT_CACHE_DIR/fil-c.git"
+        git clone --reference "$GIT_CACHE_DIR/fil-c.git" --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
+    else
+        git clone --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
+        # Create cache for future runs
+        cp -a "$FILC_SOURCE_DIR/.git" "$GIT_CACHE_DIR/fil-c.git" 2>/dev/null || true
+    fi
+
+    cd "$FILC_SOURCE_DIR"
+else
     log "Updating existing Fil-C repository..."
     cd "$FILC_SOURCE_DIR"
     git fetch --progress origin
-else
-    log "Cloning Fil-C repository..."
-    mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
-    git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
-    cd "$FILC_SOURCE_DIR"
 fi
 
-# Checkout branch first
+# Checkout logic
 git checkout "$FILC_BRANCH" || true
 
-# Pin to commit if set
-if [[ -n "$FILC_COMMIT" ]]; then
+if [[ "$FILC_USE_TAG" == "true" && -n "$FILC_TAG" ]]; then
+    log "Checking out tag: $FILC_TAG"
+    git fetch --tags --progress
+    git checkout "$FILC_TAG" || log "WARNING: Tag $FILC_TAG not found"
+elif [[ -n "$FILC_COMMIT" ]]; then
     log "Pinning to commit: $FILC_COMMIT"
-    if git cat-file -e "$FILC_COMMIT" 2>/dev/null; then
-        git checkout "$FILC_COMMIT"
-        log "Successfully checked out commit $FILC_COMMIT"
-    else
-        log "Fetching specific commit from remote..."
-        git fetch origin "$FILC_COMMIT"
-        git checkout "$FILC_COMMIT"
-        log "Successfully checked out commit $FILC_COMMIT"
-    fi
+    git fetch origin "$FILC_COMMIT" || true
+    git checkout "$FILC_COMMIT" || log "WARNING: Commit $FILC_COMMIT not found, staying on branch tip"
 fi
 
-# Final verification with fallback
+# Final verification with recovery
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "WARNING: build_all_fast_glibc.sh not found after checkout."
-    log "Attempting to reset to latest on branch..."
+    log "WARNING: build scripts not found. Resetting to branch tip..."
     git checkout "$FILC_BRANCH"
-    git pull --ff-only --progress
+    git pull --ff-only --progress || true
 fi
 
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "ERROR: Fil-C build scripts still not found after recovery attempt!"
+    log "ERROR: Fil-C build scripts still not found!"
     log "Current directory: $(pwd)"
     ls -la
     exit 1

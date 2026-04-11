@@ -51,10 +51,17 @@ export SKIP_GENTOO_BRIDGE=false
 # Force flags
 export FORCE_FRESH=${FORCE_FRESH:-false}
 
-# ====================== Git Clone Optimization ======================
+# ====================== Git Cache for Reproducibility ======================
 # Use shallow clone + shared cache for faster, more hermetic repeats
-export GIT_SHALLOW=true
-export GIT_CACHE_DIR="$HOME/.cache/filc-git-cache"
+#export GIT_SHALLOW=true # May break
+export GIT_CACHE_DIR="${GIT_CACHE_DIR:-$HOME/.cache/filc-git-cache}"
+mkdir -p "$GIT_CACHE_DIR"
+
+# Use reference cache to avoid re-downloading
+export GIT_CLONE_FLAGS="--progress"
+if [[ "$GIT_SHALLOW" == "true" ]]; then
+    export GIT_CLONE_FLAGS="$GIT_CLONE_FLAGS --depth 1"
+fi
 
 # ====================== Logging ======================
 log_config() {
