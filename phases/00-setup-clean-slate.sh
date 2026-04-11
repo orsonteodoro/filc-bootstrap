@@ -145,6 +145,13 @@ fi
 
 log "filc-bootstrap scripts bind-mounted into chroot."
 
+log "Verifying scripts are visible inside chroot..."
+if [[ ! -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
+    log "ERROR: bootstrap.sh not visible inside chroot after bind mount!"
+    ls -la "$TARGET_ROOT/root/filc-bootstrap/"
+    exit 1
+fi
+
 log "Chrooting into clean hermetic environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     set -euo pipefail
