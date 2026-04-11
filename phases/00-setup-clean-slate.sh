@@ -1,21 +1,19 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Simple reliable copy - final version)
+# Phase 00 - Setup Clean Slate (Corrected cp -aT source path)
 # =============================================================================
 
 set -euo pipefail
 
+# Calculate host paths VERY EARLY
+HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+# HOST_SCRIPT_DIR now points to the filc-bootstrap directory itself
+
+source "$HOST_SCRIPT_DIR/config.sh"
+
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
-
-# Calculate host paths VERY EARLY, before any chroot or wipe
-HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-HOST_BOOTSTRAP_PATH="$(cd "$HOST_SCRIPT_DIR/.." && pwd)"
-log "HOST_SCRIPT_DIR: ${HOST_SCRIPT_DIR}"
-log "HOST_BOOTSTRAP_PATH: ${HOST_BOOTSTRAP_PATH}"
-
-source "$HOST_SCRIPT_DIR/config.sh"
 
 log "Starting Phase 00: Clean Slate Setup"
 
@@ -26,7 +24,7 @@ TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
-log "Host bootstrap path: $HOST_BOOTSTRAP_PATH"
+log "Host bootstrap path: $HOST_SCRIPT_DIR"
 
 # ====================== Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
@@ -109,16 +107,15 @@ log "Copying filc-bootstrap scripts into chroot using cp -aT..."
 
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-# Use cp -aT from the known good host path
-log "Copying from: $HOST_BOOTSTRAP_PATH"
-log "Copying to: $TARGET_ROOT/root/filc-bootstrap"
+log "Copying from host path: $HOST_SCRIPT_DIR"
 
-cp -aT "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap" || {
-    log "cp -aT failed, trying fallback copy..."
-    cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+# Use cp -aT to avoid nesting
+cp -aT "$HOST_SCRIPT_DIR" "$TARGET_ROOT/root/filc-bootstrap" || {
+    log "WARNING: cp -aT failed, trying fallback..."
+    cp -a "$HOST_SCRIPT_DIR"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 }
 
-# Final verification
+# Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
     log "✅ bootstrap.sh copied successfully into chroot"
 else
