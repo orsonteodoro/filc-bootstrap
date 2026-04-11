@@ -31,22 +31,38 @@ if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
     log "Updating existing Fil-C repository..."
     cd "$FILC_SOURCE_DIR"
     git fetch --progress origin
-    git checkout "$FILC_BRANCH"
 else
-    log "Cloning Fil-C repository (first time may take a while)..."
+    log "Cloning Fil-C repository..."
     mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
-    git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
+
+    # Use full clone when pinning a specific commit to avoid "unable to read tree"
+    if [[ -n "$FILC_COMMIT" ]]; then
+        log "Pinned commit detected → using full clone (slower first time)"
+        git clone --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
+    else
+        git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
+    fi
     cd "$FILC_SOURCE_DIR"
 fi
+
+# Checkout branch first
+git checkout "$FILC_BRANCH"
 
 # Pin to specific commit if set
 if [[ -n "$FILC_COMMIT" ]]; then
     log "Pinning to commit: $FILC_COMMIT"
-    git checkout "$FILC_COMMIT"
-    log "Successfully checked out commit $FILC_COMMIT"
+    if git cat-file -t "$FILC_COMMIT" >/dev/null 2>&1; then
+        git checkout "$FILC_COMMIT"
+        log "Successfully checked out commit $FILC_COMMIT"
+    else
+        log "Fetching specific commit..."
+        git fetch origin "$FILC_COMMIT"
+        git checkout "$FILC_COMMIT"
+        log "Successfully checked out commit $FILC_COMMIT"
+    fi
 fi
 
-# Final check
+# Final verification
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
     log "ERROR: Fil-C build scripts not found!"
     exit 1
