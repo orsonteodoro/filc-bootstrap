@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Safe two-step copy method)
+# Phase 00 - Setup Clean Slate (Clean cp -aT version)
 # =============================================================================
 
 set -euo pipefail
@@ -29,13 +29,11 @@ log "Host bootstrap path: $HOST_BOOTSTRAP_PATH"
 # ====================== Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
-
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
         log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
 
-    log "Unmounting filesystems under $TARGET_ROOT..."
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
             umount "$TARGET_ROOT/$dir" 2>/dev/null || true
@@ -104,22 +102,16 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Reliable Copy of Bootstrap Scripts ======================
-log "Copying filc-bootstrap scripts into chroot (safe method)..."
+# ====================== Reliable Copy using cp -aT ======================
+log "Copying filc-bootstrap scripts into chroot using cp -aT..."
 
-# Copy from the known good host path
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-log "Copying from host path: $HOST_BOOTSTRAP_PATH"
-
-cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
-
-# Fallback copy if cp -a fails
-if [[ ! -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
-    log "Fallback copy using rsync or cp..."
-    rsync -a "$HOST_BOOTSTRAP_PATH"/ "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+# cp -aT treats the source as the directory itself (no extra nesting)
+cp -aT "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap" || {
+    log "WARNING: cp -aT failed, trying fallback..."
     cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
-fi
+}
 
 # Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
