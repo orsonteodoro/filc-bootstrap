@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# Phase 01 - Prepare Base Environment (Inside Chroot)
-# Pre-LC: Install dependencies and prepare the clean stage 3 environment
+# Phase 01 - Prepare Base Environment (Distro-aware)
+# Works inside Alpine minirootfs or Gentoo stage 3
 # =============================================================================
 
 set -euo pipefail
@@ -13,78 +13,85 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 01] $*"
 }
 
-log "Starting Phase 01: Prepare Base Environment (inside clean chroot)"
+log "Starting Phase 01: Prepare Base Environment"
 
-# Ensure we are running from the correct location inside chroot
+# Ensure we are in the chroot and scripts are in place
 if [[ ! -d /root/filc-bootstrap ]]; then
-    log "Creating /root/filc-bootstrap and copying scripts..."
+    log "Copying bootstrap scripts into chroot..."
     mkdir -p /root/filc-bootstrap
     cp -a "$SCRIPT_DIR"/.. /root/filc-bootstrap/ 2>/dev/null || true
-    cd /root/filc-bootstrap
+fi
+cd /root/filc-bootstrap
+
+# ====================== Detect Distro ======================
+if [[ -f /etc/gentoo-release ]]; then
+    DISTRO="gentoo"
+    log "Detected Gentoo"
+elif [[ -f /etc/alpine-release ]]; then
+    DISTRO="alpine"
+    log "Detected Alpine"
+elif [[ -f /etc/debian_version ]]; then
+    DISTRO="debian"
+    log "Detected Debian"
 else
-    cd /root/filc-bootstrap
+    DISTRO="unknown"
+    log "WARNING: Unknown distribution"
 fi
 
-# ====================== DNS Verification & Fallback ======================
-log "Verifying DNS resolution inside the chroot..."
-
+# ====================== DNS Verification ======================
+log "Verifying DNS resolution..."
 if ! ping -c 1 -W 5 -q google.com >/dev/null 2>&1; then
-    log "DNS resolution failed. Applying fallback public DNS servers..."
-    cat > /etc/resolv.conf <<'EOF'
+    log "DNS failed. Applying fallback..."
+    cat > /etc/resolv.conf <<EOF
 nameserver 8.8.8.8
 nameserver 1.1.1.1
-nameserver 8.8.4.4
 EOF
     chmod 644 /etc/resolv.conf
+fi
+log "DNS is working."
 
-    # Test again after fallback
-    if ping -c 1 -W 5 -q google.com >/dev/null 2>&1; then
-        log "Fallback DNS applied successfully."
-    else
-        log "WARNING: DNS still not working. Internet access may be limited."
-    fi
+# ====================== Install Dependencies (Distro-specific) ======================
+log "Installing build dependencies..."
+
+if [[ "$DISTRO" == "alpine" ]]; then
+    log "Alpine detected - installing packages with apk..."
+    apk add --no-cache \
+        bash git curl wget \
+        build-base clang clang-dev llvm llvm-dev \
+        cmake ninja \
+        patchelf rsync tar \
+        ca-certificates
+
+elif [[ "$DISTRO" == "gentoo" ]]; then
+    log "Gentoo detected - running emerge --sync and installing packages..."
+    emerge --sync --quiet || log "WARNING: emerge --sync failed (continuing with cache)"
+
+    emerge -av --noreplace \
+        git clang llvm cmake ninja \
+        autoconf automake libtool bison flex gawk texinfo \
+        patchelf quilt rsync tar wget curl \
+        sys-devel/gcc sys-libs/glibc
+
+elif [[ "$DISTRO" == "debian" ]]; then
+    log "Debian detected - installing with apt..."
+    apt-get update
+    apt-get install -y \
+        git clang llvm cmake ninja-build \
+        autoconf automake libtool bison flex gawk texinfo \
+        patchelf quilt rsync tar wget curl build-essential
 else
-    log "DNS resolution is working correctly."
+    log "WARNING: Unknown distro. Trying to install common tools..."
+    command -v apk && apk add --no-cache git clang cmake ninja build-base patchelf || true
+    command -v apt-get && apt-get update && apt-get install -y git clang cmake ninja-build build-essential || true
 fi
 
-# ====================== Update Portage and sync ======================
-log "Updating Portage tree..."
-emerge --sync --quiet || {
-    log "WARNING: emerge --sync failed (using cached tree if available)."
-}
+log "Build dependencies installed."
 
-# ====================== Install Build Dependencies ======================
-log "Installing required build dependencies..."
-
-emerge -av --noreplace \
-    git \
-    clang \
-    llvm \
-    cmake \
-    ninja \
-    autoconf \
-    automake \
-    libtool \
-    bison \
-    flex \
-    gawk \
-    texinfo \
-    patchelf \
-    quilt \
-    rsync \
-    tar \
-    wget \
-    curl \
-    sys-devel/gcc \
-    sys-libs/glibc
-
-log "Core build dependencies installed."
-
-# ====================== Clone / Update Fil-C Repository ======================
+# ====================== Clone / Update Fil-C ======================
 log "Setting up Fil-C source at $FILC_SOURCE_DIR"
 
 if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
-    log "Fil-C repository exists. Updating..."
+    log "Updating existing Fil-C repository..."
     cd "$FILC_SOURCE_DIR"
     git fetch origin
     git checkout "$FILC_BRANCH"
@@ -92,52 +99,34 @@ if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
         git checkout "$FILC_COMMIT"
     fi
     git pull --ff-only || true
-    log "Fil-C repository updated."
 else
-    log "Cloning Fil-C repository (branch: $FILC_BRANCH)..."
+    log "Cloning Fil-C repository..."
     mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
     git clone --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
     cd "$FILC_SOURCE_DIR"
     if [[ -n "$FILC_COMMIT" ]]; then
         git checkout "$FILC_COMMIT"
-        log "Pinned to commit: $FILC_COMMIT"
     fi
 fi
 
-# Safety check for Fil-C build scripts
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "ERROR: Fil-C build scripts not found after clone!"
+    log "ERROR: Fil-C build scripts not found!"
     exit 1
 fi
 
-log "Fil-C source is ready at $FILC_SOURCE_DIR"
+log "Fil-C source ready."
 
-# ====================== Create Backup Snapshot ======================
+# ====================== Snapshot ======================
 if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
     SNAPSHOT_NAME="${SNAPSHOT_PREFIX}-post-phase01-$(date '+%Y%m%d-%H%M%S').tar.gz"
-    log "Creating post-phase01 snapshot: $BACKUP_DIR/$SNAPSHOT_NAME"
+    log "Creating post-phase01 snapshot..."
     mkdir -p "$BACKUP_DIR"
     tar -czf "$BACKUP_DIR/$SNAPSHOT_NAME" \
-        --exclude=/proc \
-        --exclude=/sys \
-        --exclude=/dev \
-        --exclude=/run \
-        --exclude=/tmp \
-        /bin /sbin /usr/bin /usr/sbin /lib /lib64 /usr/lib /usr/lib64 /etc 2>/dev/null || true
-    log "Snapshot created."
+        --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run --exclude=/tmp \
+        /bin /usr/bin /lib /usr/lib /etc 2>/dev/null || true
 fi
 
-# ====================== Final Verification ======================
-log "Running final checks..."
-
-command -v git >/dev/null || { log "ERROR: git not found"; exit 1; }
-command -v clang >/dev/null || { log "ERROR: clang not found"; exit 1; }
-command -v patchelf >/dev/null || { log "WARNING: patchelf is missing (will be needed in LC phase)"; }
-
 log "Phase 01 completed successfully!"
-log "Clean Gentoo stage 3 is prepared and ready for Phase 02 (Build Fil-C Toolchain)."
-
-echo ""
-echo "Next: Building Fil-C compiler and runtime (Phase 02)"
+log "Ready for Phase 02: Building Fil-C toolchain."
 
 exit 0
