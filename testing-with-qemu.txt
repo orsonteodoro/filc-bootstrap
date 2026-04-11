@@ -7,7 +7,7 @@ cd ~/qemu-alpine
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso
 
 cd ~/qemu-alpine
-qemu-img create -f qcow2 alpine.qcow2 20G
+qemu-img create -f qcow2 alpine.qcow2 40G
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 qemu-system-x86_64 \
