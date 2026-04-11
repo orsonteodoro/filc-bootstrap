@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Robust ISO mounting)
+# Phase 00 - Setup Clean Slate (BusyBox-compatible Alpine ISO handling)
 # =============================================================================
 
 set -euo pipefail
@@ -12,13 +12,12 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Slate Setup (Robust ISO)"
+log "Starting Phase 00: Clean Slate Setup (BusyBox-safe)"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
 TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 
-# Reproducible ISO URLs
 ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
@@ -34,9 +33,9 @@ if [[ "$FORCE_FRESH" == "true" ]]; then
     rm -rf "$TARGET_ROOT"/*
 fi
 
-# ====================== Alpine ISO Setup ======================
+# ====================== Alpine ISO Setup (BusyBox compatible) ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Setting up Alpine from ISO..."
+    log "Setting up Alpine from ISO (BusyBox compatible)..."
 
     ISO_DIR="$HOME/qemu-alpine"
     ISO_FILE="$ISO_DIR/alpine-standard-3.23.0-x86_64.iso"
@@ -44,43 +43,32 @@ if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
     mkdir -p "$ISO_DIR"
 
     if [[ ! -f "$ISO_FILE" ]]; then
-        log "Downloading Alpine ISO for reproducibility..."
+        log "Downloading Alpine ISO..."
         wget -c -O "$ISO_FILE" "$ALPINE_ISO_URL"
     else
         log "Using existing ISO: $ISO_FILE"
     fi
 
-    # Robust mount
     log "Mounting Alpine ISO..."
     mkdir -p /mnt/alpine-iso
+    mount -o loop,ro "$ISO_FILE" /mnt/alpine-iso || {
+        log "ERROR: Failed to mount ISO"
+        exit 1
+    }
 
-    # Clean up any stale loop devices
-    losetup -D 2>/dev/null || true
+    log "Copying Alpine live filesystem (BusyBox-safe method)..."
+    # Use cp instead of rsync to avoid BusyBox limitations
+    cp -a /mnt/alpine-iso/. "$TARGET_ROOT/" 2>/dev/null || true
 
-    if ! mount -o loop,ro "$ISO_FILE" /mnt/alpine-iso 2>/dev/null; then
-        log "ERROR: Failed to mount ISO. Trying alternative method..."
-        # Fallback: use losetup manually
-        LOOPDEV=$(losetup -fP --show "$ISO_FILE")
-        if [[ -n "$LOOPDEV" ]]; then
-            mount -o ro "${LOOPDEV}p1" /mnt/alpine-iso 2>/dev/null || \
-            mount -o ro "$LOOPDEV" /mnt/alpine-iso || {
-                log "ERROR: All mount attempts failed"
-                exit 1
-            }
-        else
-            log "ERROR: Could not set up loop device"
-            exit 1
-        fi
-    fi
-
-    log "ISO mounted successfully. Copying live filesystem..."
-    rsync -a --exclude=/dev --exclude=/proc --exclude=/sys --exclude=/run \
-        /mnt/alpine-iso/ "$TARGET_ROOT/" || true
+    # Remove things that shouldn't be copied from live ISO
+    rm -rf "$TARGET_ROOT/dev" "$TARGET_ROOT/proc" "$TARGET_ROOT/sys" "$TARGET_ROOT/run" 2>/dev/null || true
 
     umount /mnt/alpine-iso 2>/dev/null || true
     rmdir /mnt/alpine-iso 2>/dev/null || true
 
-# ====================== Debian (debootstrap fallback) ======================
+    log "Alpine filesystem copied successfully."
+
+# ====================== Debian ======================
 elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
     log "Creating Debian clean slate using debootstrap..."
     if ! command -v debootstrap >/dev/null; then
@@ -88,7 +76,7 @@ elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
     fi
     debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
 
-# ====================== Gentoo Stage 3 ======================
+# ====================== Gentoo ======================
 else
     log "Creating clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
