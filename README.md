@@ -130,6 +130,6 @@ filc-bootstrap/
 ---
 
 * Related repository: [filc-overlay](https://github.com/orsonteodoro/filc-overlay) — Gentoo ebuilds and Post-LC integration.
-* Status: In active development, code review phase before testing in production phase
+* Status: In active development, testing and development phase, pre-alpha quality, NOT FOR PRODUCTION
 
 ---
