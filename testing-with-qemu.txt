@@ -63,6 +63,4 @@ cd filc-bootstrap
 
 chmod +x ./setup-alpine-guest-filc-test.sh
 ./setup-alpine-guest-filc-test.sh
-
-cd ~/filc-test
 ./bootstrap.sh --test-alpine
