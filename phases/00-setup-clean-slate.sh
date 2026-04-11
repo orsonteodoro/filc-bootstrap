@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (with reproducible ISO fallbacks)
+# Phase 00 - Setup Clean Slate (Robust ISO mounting)
 # =============================================================================
 
 set -euo pipefail
@@ -12,15 +12,14 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Slate Setup (with ISO fallbacks)"
+log "Starting Phase 00: Clean Slate Setup (Robust ISO)"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
 TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 
-# ====================== Reproducible ISO Fallback URLs ======================
+# Reproducible ISO URLs
 ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso"
-DEBIAN_ISO_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
@@ -35,9 +34,9 @@ if [[ "$FORCE_FRESH" == "true" ]]; then
     rm -rf "$TARGET_ROOT"/*
 fi
 
-# ====================== Alpine ISO-based Setup ======================
+# ====================== Alpine ISO Setup ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Setting up Alpine from ISO (reproducible fallback)"
+    log "Setting up Alpine from ISO..."
 
     ISO_DIR="$HOME/qemu-alpine"
     ISO_FILE="$ISO_DIR/alpine-standard-3.23.0-x86_64.iso"
@@ -45,38 +44,45 @@ if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
     mkdir -p "$ISO_DIR"
 
     if [[ ! -f "$ISO_FILE" ]]; then
-        log "Downloading tested Alpine ISO for reproducibility..."
+        log "Downloading Alpine ISO for reproducibility..."
         wget -c -O "$ISO_FILE" "$ALPINE_ISO_URL"
     else
-        log "Using existing Alpine ISO: $ISO_FILE"
+        log "Using existing ISO: $ISO_FILE"
     fi
 
+    # Robust mount
     log "Mounting Alpine ISO..."
     mkdir -p /mnt/alpine-iso
-    mount -o loop "$ISO_FILE" /mnt/alpine-iso
 
-    log "Copying Alpine live filesystem to $TARGET_ROOT..."
+    # Clean up any stale loop devices
+    losetup -D 2>/dev/null || true
+
+    if ! mount -o loop,ro "$ISO_FILE" /mnt/alpine-iso 2>/dev/null; then
+        log "ERROR: Failed to mount ISO. Trying alternative method..."
+        # Fallback: use losetup manually
+        LOOPDEV=$(losetup -fP --show "$ISO_FILE")
+        if [[ -n "$LOOPDEV" ]]; then
+            mount -o ro "${LOOPDEV}p1" /mnt/alpine-iso 2>/dev/null || \
+            mount -o ro "$LOOPDEV" /mnt/alpine-iso || {
+                log "ERROR: All mount attempts failed"
+                exit 1
+            }
+        else
+            log "ERROR: Could not set up loop device"
+            exit 1
+        fi
+    fi
+
+    log "ISO mounted successfully. Copying live filesystem..."
     rsync -a --exclude=/dev --exclude=/proc --exclude=/sys --exclude=/run \
         /mnt/alpine-iso/ "$TARGET_ROOT/" || true
 
-    umount /mnt/alpine-iso
-    rmdir /mnt/alpine-iso
+    umount /mnt/alpine-iso 2>/dev/null || true
+    rmdir /mnt/alpine-iso 2>/dev/null || true
 
-# ====================== Debian ISO-based Setup (optional) ======================
+# ====================== Debian (debootstrap fallback) ======================
 elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
-    log "Setting up Debian from ISO (fallback method)"
-
-    ISO_DIR="$HOME/qemu-debian"
-    ISO_FILE="$ISO_DIR/debian-12.10.0-amd64-netinst.iso"
-
-    mkdir -p "$ISO_DIR"
-
-    if [[ ! -f "$ISO_FILE" ]]; then
-        log "Downloading tested Debian netinst ISO..."
-        wget -c -O "$ISO_FILE" "$DEBIAN_ISO_URL"
-    fi
-
-    log "Debian ISO-based setup is complex. Falling back to debootstrap for reliability."
+    log "Creating Debian clean slate using debootstrap..."
     if ! command -v debootstrap >/dev/null; then
         apt-get update && apt-get install -y debootstrap
     fi
@@ -84,7 +90,7 @@ elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
 
 # ====================== Gentoo Stage 3 ======================
 else
-    log "Creating clean Gentoo stage 3 from official tarball..."
+    log "Creating clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     LATEST_FILE="latest-stage3-amd64.txt"
     STAGE3_PROFILE="stage3-amd64"
