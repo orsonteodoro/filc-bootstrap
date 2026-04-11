@@ -1,15 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Corrected host path bind mount)
+# Phase 00 - Setup Clean Slate (Simple reliable copy method)
 # =============================================================================
 
 set -euo pipefail
 
-# Calculate host paths BEFORE any chroot
-HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-HOST_BOOTSTRAP_PATH="$(cd "$HOST_SCRIPT_DIR/.." && pwd)"
-
-source "$HOST_SCRIPT_DIR/config.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+source "$SCRIPT_DIR/config.sh"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
@@ -24,7 +21,6 @@ TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
-log "Host bootstrap path: $HOST_BOOTSTRAP_PATH"
 
 # Gentle fresh wipe
 if [[ "$FORCE_FRESH" == "true" ]]; then
@@ -101,35 +97,35 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Correct Bind Mount ======================
-log "Setting up bind mount for filc-bootstrap scripts..."
+# ====================== Reliable Copy of Bootstrap Scripts ======================
+log "Copying filc-bootstrap scripts into chroot (reliable copy method)..."
 
+# Use rsync if available, fallback to cp
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-log "Bind mounting: $HOST_BOOTSTRAP_PATH  →  $TARGET_ROOT/root/filc-bootstrap"
+if command -v rsync >/dev/null; then
+    rsync -a --delete "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" || true
+else
+    cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" || true
+fi
 
-mount --bind "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap"
-
-# Create dummy file on host
-DUMMY_FILE="$HOST_BOOTSTRAP_PATH/DUMMY_TEST_FILE.txt"
-echo "Dummy test file created on host at $(date)" > "$DUMMY_FILE"
-
-log "Dummy file created at $DUMMY_FILE on host"
+# Extra safety copy
+cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 
 # Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
-    log "✅ bootstrap.sh is visible inside chroot"
+    log "✅ bootstrap.sh copied successfully into chroot"
 else
-    log "ERROR: bootstrap.sh is STILL not visible inside chroot"
+    log "ERROR: bootstrap.sh still not found after copy"
     ls -la "$TARGET_ROOT/root/filc-bootstrap/"
     exit 1
 fi
 
-if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
-    log "✅ Dummy file test passed"
-fi
+# Create dummy file
+echo "Dummy test file created at $(date)" > "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt"
+log "Dummy file created inside chroot"
 
-# ====================== Chroot with diagnostics ======================
+# ====================== Chroot ======================
 log "Chrooting into clean environment..."
 
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
