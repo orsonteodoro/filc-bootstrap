@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Corrected bind mount)
+# Phase 00 - Setup Clean Slate (Fixed ordering for --fresh + bind mount)
 # =============================================================================
 
 set -euo pipefail
@@ -22,14 +22,18 @@ ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-# Gentle fresh wipe
+HOST_BOOTSTRAP_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ====================== Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
-    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
+
+    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" || -z "$TARGET_ROOT" ]]; then
         log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
 
+    log "Unmounting filesystems under $TARGET_ROOT..."
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
             umount "$TARGET_ROOT/$dir" 2>/dev/null || true
@@ -42,6 +46,7 @@ if [[ "$FORCE_FRESH" == "true" ]]; then
         fi
     done
 
+    log "Wiping target directory..."
     rm -rf "$TARGET_ROOT"/* 2>/dev/null || true
 fi
 
@@ -97,36 +102,32 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== CORRECT Bind Mount ======================
+# ====================== Bind Mount Bootstrap Scripts ======================
 log "Setting up bind mount for filc-bootstrap scripts..."
 
-# Use the original host path from SCRIPT_DIR
-HOST_BOOTSTRAP_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
+mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
 log "Bind mounting host path: $HOST_BOOTSTRAP_PATH  →  $TARGET_ROOT/root/filc-bootstrap"
 
-mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 mount --bind "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap"
 
-# Create dummy file on the **host** side
+# Create dummy file on host side
 DUMMY_FILE="$HOST_BOOTSTRAP_PATH/DUMMY_TEST_FILE.txt"
 echo "Dummy test file created on host at $(date)" > "$DUMMY_FILE"
 
-log "Dummy file created at $DUMMY_FILE on host"
+log "Dummy file created at $DUMMY_FILE"
 
-# Verify inside chroot
-if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
-    log "✅ Dummy file is visible inside chroot"
-else
-    log "WARNING: Dummy file NOT visible inside chroot"
-fi
-
+# Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
     log "✅ bootstrap.sh is visible inside chroot"
 else
-    log "ERROR: bootstrap.sh is STILL not visible inside chroot"
+    log "ERROR: bootstrap.sh is NOT visible inside chroot"
     ls -la "$TARGET_ROOT/root/filc-bootstrap/"
     exit 1
+fi
+
+if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
+    log "✅ Dummy file test passed"
 fi
 
 # ====================== Chroot with diagnostics ======================
@@ -142,7 +143,7 @@ exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     ls -la
 
     if [[ -f bootstrap.sh ]]; then
-        echo "✅ bootstrap.sh FOUND - starting bootstrap"
+        echo "✅ bootstrap.sh FOUND"
     else
         echo "ERROR: bootstrap.sh NOT FOUND!"
         ls -la /root/filc-bootstrap/
