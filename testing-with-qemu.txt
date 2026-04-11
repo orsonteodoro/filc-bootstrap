@@ -1,5 +1,7 @@
 # Instructions for creating a VM for testing bootstraping before the expensive gentoo bootstrapping.
 
+# Outside in the host do
+
 mkdir -p ~/qemu-alpine
 cd ~/qemu-alpine
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso
@@ -22,16 +24,19 @@ qemu-system-x86_64 \
 chmod +x ~/qemu-alpine/setup.sh
 ./setup.sh
 
-# In alpine:
+# In the Alpine guest do
+
+# login as root
 setup-alpine
-# root - no password
+# Most options you just press enter.  The ones to worry about are
+# Password → of your choosing
 # Keyboard layout → usually us
-# Hostname → anything (e.g. filc-test)
-# Networking → use DHCP (default is fine)
-# Disk → choose sda (or vda), use sys mode (full disk install)
+# Disk → choose vda then choose sys mode
 
 sync
 # Shutdown vm
+
+# Outside in the host do
 
 # Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
 qemu-system-x86_64 \
@@ -46,20 +51,16 @@ qemu-system-x86_64 \
 chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
-# Update available packages list and install git to download filc-bootstrap
+# Inside the Alpine guest do
+
+# Update available packages list and tools required to get filc-bootstrap
 apk update
-apk add git bash curl wget build-base clang cmake ninja patchelf
+apk add git bash
 
-# Create a working directory
-mkdir -p ~/filc-test
-cd ~/filc-test
-
-# Copy your filc-bootstrap repo into the VM
-# (easiest way: use scp from host, or git clone inside)
+# Copy the filc-bootstrap repo into the VM
 git clone https://github.com/orsonteodoro/filc-bootstrap.git
 cd filc-bootstrap
 
-# Inside the Alpine guest
 chmod +x ./setup-alpine-guest-filc-test.sh
 ./setup-alpine-guest-filc-test.sh
 
