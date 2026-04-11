@@ -5,6 +5,10 @@
 
 set -euo pipefail
 
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
+}
+
 # Calculate host paths VERY EARLY, before any chroot or wipe
 HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
 HOST_BOOTSTRAP_PATH="$(cd "$HOST_SCRIPT_DIR/.." && pwd)"
@@ -12,10 +16,6 @@ log "HOST_SCRIPT_DIR: ${HOST_SCRIPT_DIR}"
 log "HOST_BOOTSTRAP_PATH: ${HOST_BOOTSTRAP_PATH}"
 
 source "$HOST_SCRIPT_DIR/config.sh"
-
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
-}
 
 log "Starting Phase 00: Clean Slate Setup"
 
