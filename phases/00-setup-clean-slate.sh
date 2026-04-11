@@ -1,6 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (BusyBox-compatible Alpine ISO handling)
+# Phase 00 - Setup Clean Slate (Option 1: Alpine minirootfs + Gentoo stage 3)
+# Purpose: Create uncontaminated, hermetic, reproducible environment
 # =============================================================================
 
 set -euo pipefail
@@ -12,73 +13,57 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Slate Setup (BusyBox-safe)"
+log "Starting Phase 00: Clean Hermetic Slate Setup (Minirootfs)"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
 TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 
-ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso"
+# Reproducible URLs
+ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-mkdir -p "$TARGET_ROOT"
-
+# Safety check
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — wiping $TARGET_ROOT"
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
-        log "ERROR: Refusing to wipe dangerous path"
+        log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
         exit 1
     fi
     rm -rf "$TARGET_ROOT"/*
 fi
 
-# ====================== Alpine ISO Setup (BusyBox compatible) ======================
+mkdir -p "$TARGET_ROOT"
+
+# ====================== Alpine Minirootfs (Clean & Hermetic) ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Setting up Alpine from ISO (BusyBox compatible)..."
+    log "Using Alpine minirootfs for clean hermetic test environment"
 
-    ISO_DIR="$HOME/qemu-alpine"
-    ISO_FILE="$ISO_DIR/alpine-standard-3.23.0-x86_64.iso"
+    MINIROOTFS_FILE="/tmp/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
-    mkdir -p "$ISO_DIR"
-
-    if [[ ! -f "$ISO_FILE" ]]; then
-        log "Downloading Alpine ISO..."
-        wget -c -O "$ISO_FILE" "$ALPINE_ISO_URL"
+    if [[ ! -f "$MINIROOTFS_FILE" ]]; then
+        log "Downloading Alpine minirootfs for reproducibility..."
+        wget -c -O "$MINIROOTFS_FILE" "$ALPINE_MINIROOTFS_URL"
     else
-        log "Using existing ISO: $ISO_FILE"
+        log "Using cached minirootfs: $MINIROOTFS_FILE"
     fi
 
-    log "Mounting Alpine ISO..."
-    mkdir -p /mnt/alpine-iso
-    mount -o loop,ro "$ISO_FILE" /mnt/alpine-iso || {
-        log "ERROR: Failed to mount ISO"
-        exit 1
-    }
+    log "Unpacking clean Alpine minirootfs into $TARGET_ROOT..."
+    tar -xzf "$MINIROOTFS_FILE" -C "$TARGET_ROOT"
 
-    log "Copying Alpine live filesystem (BusyBox-safe method)..."
-    # Use cp instead of rsync to avoid BusyBox limitations
-    cp -a /mnt/alpine-iso/. "$TARGET_ROOT/" 2>/dev/null || true
+    # Setup APK repositories
+    mkdir -p "$TARGET_ROOT/etc/apk"
+    cat > "$TARGET_ROOT/etc/apk/repositories" <<EOF
+http://dl-cdn.alpinelinux.org/alpine/v3.23/main
+http://dl-cdn.alpinelinux.org/alpine/v3.23/community
+EOF
 
-    # Remove things that shouldn't be copied from live ISO
-    rm -rf "$TARGET_ROOT/dev" "$TARGET_ROOT/proc" "$TARGET_ROOT/sys" "$TARGET_ROOT/run" 2>/dev/null || true
+    log "✅ Alpine minirootfs unpacked successfully (hermetic base ready)."
 
-    umount /mnt/alpine-iso 2>/dev/null || true
-    rmdir /mnt/alpine-iso 2>/dev/null || true
-
-    log "Alpine filesystem copied successfully."
-
-# ====================== Debian ======================
-elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
-    log "Creating Debian clean slate using debootstrap..."
-    if ! command -v debootstrap >/dev/null; then
-        apt-get update && apt-get install -y debootstrap
-    fi
-    debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
-
-# ====================== Gentoo ======================
+# ====================== Gentoo Stage 3 (for real builds) ======================
 else
-    log "Creating clean Gentoo stage 3..."
+    log "Setting up clean Gentoo stage 3 (hermetic full build)"
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     LATEST_FILE="latest-stage3-amd64.txt"
     STAGE3_PROFILE="stage3-amd64"
@@ -88,7 +73,7 @@ else
 
     STAGE3_TARBALL=$(grep -E "${STAGE3_PROFILE}-.*\.tar\.xz$" latest-stage3.txt | awk '{print $1}' | tail -n1)
     if [[ -z "$STAGE3_TARBALL" ]]; then
-        log "ERROR: Could not find Gentoo stage 3"
+        log "ERROR: Could not find Gentoo stage 3 tarball"
         exit 1
     fi
 
@@ -103,8 +88,9 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Common Setup ======================
+# ====================== Common Chroot Setup ======================
 log "Setting up chroot mounts and DNS..."
+
 mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
 mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
 mount --make-rslave "$TARGET_ROOT/sys" 2>/dev/null || true
@@ -119,11 +105,11 @@ log "Copying filc-bootstrap scripts into chroot..."
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 
-log "Chrooting into clean environment..."
+log "Chrooting into clean hermetic environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     set -euo pipefail
     cd /root/filc-bootstrap
-    echo "=== Now running inside clean chroot ==="
+    echo "=== Now running inside clean hermetic chroot ==="
     exec ./bootstrap.sh --skip-clean-slate "$@"
 CHROOT_EOF
 
