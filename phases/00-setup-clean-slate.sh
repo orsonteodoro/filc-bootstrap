@@ -107,7 +107,8 @@ log "Copying filc-bootstrap scripts into chroot using cp -aT..."
 
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-log "Copying from host path: $HOST_SCRIPT_DIR"
+log "Copying from:  $HOST_SCRIPT_DIR"
+log "Copying to:  $TARGET_ROOT/root/filc-bootstrap"
 
 # Use cp -aT to avoid nesting
 cp -aT "$HOST_SCRIPT_DIR" "$TARGET_ROOT/root/filc-bootstrap" || {
