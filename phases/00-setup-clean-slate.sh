@@ -1,7 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (ISO-based approach)
-# Mounts/unpacks ISO or stage3 directly for a true clean environment
+# Phase 00 - Setup Clean Slate (with reproducible ISO fallbacks)
 # =============================================================================
 
 set -euo pipefail
@@ -13,61 +12,77 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Slate Setup (ISO-based)"
+log "Starting Phase 00: Clean Slate Setup (with ISO fallbacks)"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
 TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 
-log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
+# ====================== Reproducible ISO Fallback URLs ======================
+ALPINE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso"
+DEBIAN_ISO_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso"
 
-# Safety guard
-if [[ "$FORCE_FRESH" == "true" ]]; then
-    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
-        log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
-        exit 1
-    fi
-    log "Force fresh enabled — wiping $TARGET_ROOT"
-    rm -rf "$TARGET_ROOT"/*
-fi
+log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
 mkdir -p "$TARGET_ROOT"
 
-# ====================== Alpine ISO-based Clean Slate ======================
-if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Setting up Alpine clean slate from ISO..."
-
-    ISO_PATH="${ISO_PATH:-~/qemu-alpine/alpine-standard-*.iso}"
-
-    if ls $ISO_PATH 1> /dev/null 2>&1; then
-        ISO_FILE=$(ls $ISO_PATH | head -n1)
-        log "Found Alpine ISO: $ISO_FILE"
-
-        # Mount ISO
-        mkdir -p /mnt/alpine-iso
-        mount -o loop "$ISO_FILE" /mnt/alpine-iso
-
-        # Copy root filesystem from ISO (live environment)
-        log "Copying Alpine live root to $TARGET_ROOT..."
-        rsync -a --exclude=/dev --exclude=/proc --exclude=/sys --exclude=/run /mnt/alpine-iso/ "$TARGET_ROOT/" || true
-
-        umount /mnt/alpine-iso
-        rmdir /mnt/alpine-iso
-    else
-        log "ERROR: Alpine ISO not found at $ISO_PATH"
-        log "Please place the Alpine standard ISO in ~/qemu-alpine/ or set ISO_PATH"
+if [[ "$FORCE_FRESH" == "true" ]]; then
+    log "Force fresh enabled — wiping $TARGET_ROOT"
+    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
+        log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
+    rm -rf "$TARGET_ROOT"/*
+fi
 
-# ====================== Debian (keep debootstrap for now) ======================
+# ====================== Alpine ISO-based Setup ======================
+if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
+    log "Setting up Alpine from ISO (reproducible fallback)"
+
+    ISO_DIR="$HOME/qemu-alpine"
+    ISO_FILE="$ISO_DIR/alpine-standard-3.23.0-x86_64.iso"
+
+    mkdir -p "$ISO_DIR"
+
+    if [[ ! -f "$ISO_FILE" ]]; then
+        log "Downloading tested Alpine ISO for reproducibility..."
+        wget -c -O "$ISO_FILE" "$ALPINE_ISO_URL"
+    else
+        log "Using existing Alpine ISO: $ISO_FILE"
+    fi
+
+    log "Mounting Alpine ISO..."
+    mkdir -p /mnt/alpine-iso
+    mount -o loop "$ISO_FILE" /mnt/alpine-iso
+
+    log "Copying Alpine live filesystem to $TARGET_ROOT..."
+    rsync -a --exclude=/dev --exclude=/proc --exclude=/sys --exclude=/run \
+        /mnt/alpine-iso/ "$TARGET_ROOT/" || true
+
+    umount /mnt/alpine-iso
+    rmdir /mnt/alpine-iso
+
+# ====================== Debian ISO-based Setup (optional) ======================
 elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
-    log "Creating Debian clean slate using debootstrap..."
+    log "Setting up Debian from ISO (fallback method)"
+
+    ISO_DIR="$HOME/qemu-debian"
+    ISO_FILE="$ISO_DIR/debian-12.10.0-amd64-netinst.iso"
+
+    mkdir -p "$ISO_DIR"
+
+    if [[ ! -f "$ISO_FILE" ]]; then
+        log "Downloading tested Debian netinst ISO..."
+        wget -c -O "$ISO_FILE" "$DEBIAN_ISO_URL"
+    fi
+
+    log "Debian ISO-based setup is complex. Falling back to debootstrap for reliability."
     if ! command -v debootstrap >/dev/null; then
         apt-get update && apt-get install -y debootstrap
     fi
     debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
 
-# ====================== Gentoo Stage 3 (original) ======================
+# ====================== Gentoo Stage 3 ======================
 else
     log "Creating clean Gentoo stage 3 from official tarball..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
