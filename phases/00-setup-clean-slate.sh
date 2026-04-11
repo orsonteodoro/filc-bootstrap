@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Fixed bind mount + diagnostics)
+# Phase 00 - Setup Clean Slate (Corrected bind mount)
 # =============================================================================
 
 set -euo pipefail
@@ -71,7 +71,6 @@ EOF
     apk --root "$TARGET_ROOT" --no-cache add \
         bash git curl wget build-base clang cmake ninja patchelf rsync tar
 
-# Gentoo fallback
 else
     log "Setting up clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
@@ -98,34 +97,30 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Strong Bind Mount with Verification ======================
+# ====================== CORRECT Bind Mount ======================
 log "Setting up bind mount for filc-bootstrap scripts..."
 
-# Create the directory inside chroot
+# Use the original host path from SCRIPT_DIR
+HOST_BOOTSTRAP_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+log "Bind mounting host path: $HOST_BOOTSTRAP_PATH  →  $TARGET_ROOT/root/filc-bootstrap"
+
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
+mount --bind "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap"
 
-# Bind mount the **host's** bootstrap directory to the chroot's /root/filc-bootstrap
-# Use the original SCRIPT_DIR from host
-HOST_BOOTSTRAP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-log "Bind mounting host path: $HOST_BOOTSTRAP_DIR → $TARGET_ROOT/root/filc-bootstrap"
-
-mount --bind "$HOST_BOOTSTRAP_DIR" "$TARGET_ROOT/root/filc-bootstrap"
-
-# Create dummy file on host
-DUMMY_FILE="$HOST_BOOTSTRAP_DIR/DUMMY_TEST_FILE.txt"
+# Create dummy file on the **host** side
+DUMMY_FILE="$HOST_BOOTSTRAP_PATH/DUMMY_TEST_FILE.txt"
 echo "Dummy test file created on host at $(date)" > "$DUMMY_FILE"
 
-log "Dummy file created at $DUMMY_FILE"
+log "Dummy file created at $DUMMY_FILE on host"
 
-# Verify inside chroot path
+# Verify inside chroot
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
     log "✅ Dummy file is visible inside chroot"
 else
     log "WARNING: Dummy file NOT visible inside chroot"
 fi
 
-# Check for bootstrap.sh
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
     log "✅ bootstrap.sh is visible inside chroot"
 else
@@ -147,7 +142,7 @@ exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     ls -la
 
     if [[ -f bootstrap.sh ]]; then
-        echo "✅ bootstrap.sh FOUND - proceeding"
+        echo "✅ bootstrap.sh FOUND - starting bootstrap"
     else
         echo "ERROR: bootstrap.sh NOT FOUND!"
         ls -la /root/filc-bootstrap/
