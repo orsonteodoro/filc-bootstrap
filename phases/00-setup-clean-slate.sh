@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Calculate host paths VERY EARLY, before any chroot or wipe
-HOST_SCRIPT_DIR=$(dirname $(realpath "${BASH_SOURCE[0]}") )
+HOST_SCRIPT_DIR=$(realpath $(dirname $(realpath "${BASH_SOURCE[0]}") )"/.." )
 HOST_BOOTSTRAP_PATH=$(realpath "$HOST_SCRIPT_DIR/..")
 
 source "$HOST_SCRIPT_DIR/config.sh"
