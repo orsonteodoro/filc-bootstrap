@@ -1,7 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# filc-bootstrap - Main bootstrap driver
-# Supports clean Gentoo stage 3 + fast test mode (Debian / Alpine)
+# filc-bootstrap - Main bootstrap driver (with --skip-clean-slate support)
 # =============================================================================
 
 set -euo pipefail
@@ -9,14 +8,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Load configuration
-if [[ ! -f ./config.sh ]]; then
+source ./config.sh || {
     echo "ERROR: config.sh not found!"
     exit 1
-fi
-source ./config.sh
+}
 
-# Create directories
 mkdir -p "$LOG_DIR" "$CHECKPOINT_DIR" "$BACKUP_DIR" "$FILC_SOURCE_DIR"
 
 log() {
@@ -51,32 +47,26 @@ run_phase() {
 # ====================== Argument Parsing ======================
 FORCE_FRESH=false
 TEST_MODE=false
-TEST_DISTRO="debian"
+TEST_DISTRO="alpine"
+SKIP_CLEAN_SLATE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --fresh)           FORCE_FRESH=true ;;
-        --test)            TEST_MODE=true ;;
-        --test-debian)     TEST_MODE=true; TEST_DISTRO="debian" ;;
-        --test-alpine)     TEST_MODE=true; TEST_DISTRO="alpine" ;;
-        --clean-slate)     TEST_MODE=false ;;   # Force real Gentoo
-        --update-filc)     UPDATE_FILC_ONLY=true ;;
-        --recover-lc)      RECOVER_LC=true ;;
+        --fresh)            FORCE_FRESH=true ;;
+        --test)             TEST_MODE=true ;;
+        --test-debian)      TEST_MODE=true; TEST_DISTRO="debian" ;;
+        --test-alpine)      TEST_MODE=true; TEST_DISTRO="alpine" ;;
+        --clean-slate)      TEST_MODE=false ;;
+        --skip-clean-slate) SKIP_CLEAN_SLATE=true ;;
+        --update-filc)      UPDATE_FILC_ONLY=true ;;
+        --recover-lc)       RECOVER_LC=true ;;
         --help|-h)
             echo "Usage: ./bootstrap.sh [OPTIONS]"
-            echo ""
-            echo "Test modes (fast validation):"
-            echo "  --test              Test with Debian (default)"
-            echo "  --test-debian       Test with Debian"
-            echo "  --test-alpine       Test with Alpine"
-            echo ""
-            echo "Real build:"
-            echo "  --clean-slate       Use clean Gentoo stage 3"
+            echo "  --test              Fast test with Debian"
+            echo "  --test-alpine       Fast test with Alpine"
+            echo "  --clean-slate       Full Gentoo stage 3 build"
             echo "  --fresh             Ignore checkpoints"
-            echo ""
-            echo "Advanced:"
-            echo "  --update-filc       Only update Fil-C toolchain"
-            echo "  --recover-lc        Recover LC phase only"
+            echo "  --skip-clean-slate  Skip Phase 00 (use when already in chroot)"
             exit 0
             ;;
         *)
@@ -90,15 +80,31 @@ done
 log "filc-bootstrap started"
 log_config
 
-# Set test mode variables for Phase 00
-if [[ "$TEST_MODE" == "true" ]]; then
-    export TEST_MODE=true
-    export TEST_DISTRO="$TEST_DISTRO"
-    log "=== TEST MODE ENABLED ($TEST_DISTRO) ==="
+# If we are told to skip clean slate, run the inner phases directly
+if [[ "$SKIP_CLEAN_SLATE" == "true" ]]; then
+    log "Skipping Phase 00 (--skip-clean-slate)"
+    log "Running inner bootstrap phases directly..."
+    
+    if [[ "$UPDATE_FILC_ONLY" == "true" ]]; then
+        run_phase "./phases/02-build-filc-toolchain.sh"
+        run_phase "./phases/03-setup-dual-libc.sh"
+    else
+        run_phase "./phases/01-prepare-base.sh"
+        run_phase "./phases/02-build-filc-toolchain.sh"
+        run_phase "./phases/03-setup-dual-libc.sh"
+        run_phase "./phases/03.5-test-hello-world.sh"
+        
+        if [[ -f /etc/gentoo-release ]]; then
+            run_phase "./phases/04-gentoo-bridge.sh"
+        fi
+    fi
+
+    log "Bootstrap completed (skipped Phase 00)"
+    exit 0
 fi
 
-# ====================== Launch Phase 00 ======================
-log "Starting Phase 00 (Clean Slate / Chroot Setup)"
+# Normal flow - start with Phase 00
+log "Starting normal flow with Phase 00"
 ./phases/00-setup-clean-slate.sh "$@"
 
 exit 0
