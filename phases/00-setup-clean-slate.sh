@@ -1,7 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Fixed for Alpine minirootfs + bash)
-# Purpose: Create clean, hermetic, reproducible environment
+# Phase 00 - Setup Clean Slate (Safe --fresh with unmount)
 # =============================================================================
 
 set -euo pipefail
@@ -13,7 +12,7 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Hermetic Slate Setup"
+log "Starting Phase 00: Clean Slate Setup"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
@@ -23,17 +22,30 @@ ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-mkdir -p "$TARGET_ROOT"
-
+# ====================== Safety: Unmount before fresh wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
-    log "Force fresh enabled — wiping $TARGET_ROOT"
+    log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
+
+    # Strong safety check
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
-        log "ERROR: Refusing to wipe dangerous path"
+        log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
         exit 1
     fi
+
+    log "Unmounting any active mounts in $TARGET_ROOT..."
+    for dir in proc sys dev run; do
+        if mountpoint -q "$TARGET_ROOT/$dir"; then
+            umount -R -l "$TARGET_ROOT/$dir" 2>/dev/null || true
+        fi
+    done
+
+    log "Wiping target directory..."
     rm -rf "$TARGET_ROOT"/*
 fi
 
+mkdir -p "$TARGET_ROOT"
+
+# ====================== Alpine Minirootfs ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
     log "Using Alpine minirootfs for clean hermetic test"
 
@@ -47,23 +59,21 @@ if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
     log "Unpacking Alpine minirootfs..."
     tar -xzf "$MINIROOTFS_FILE" -C "$TARGET_ROOT"
 
-    # Setup repositories
     mkdir -p "$TARGET_ROOT/etc/apk"
     cat > "$TARGET_ROOT/etc/apk/repositories" <<EOF
 http://dl-cdn.alpinelinux.org/alpine/v3.23/main
 http://dl-cdn.alpinelinux.org/alpine/v3.23/community
 EOF
 
-    # Install bash and other essential tools **before** chroot
-    log "Installing bash and build tools into minirootfs..."
+    log "Installing bash and build tools..."
     apk --root "$TARGET_ROOT" --no-cache add \
         bash git curl wget \
         build-base clang cmake ninja patchelf rsync tar
 
-    log "✅ Alpine minirootfs ready with bash and tools."
+    log "✅ Alpine minirootfs ready with bash."
 
+# ====================== Gentoo Stage 3 ======================
 else
-    # Gentoo stage 3
     log "Setting up clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     LATEST_FILE="latest-stage3-amd64.txt"
