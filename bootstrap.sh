@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# filc-bootstrap - Main bootstrap driver (with --skip-clean-slate support)
+# filc-bootstrap - Main bootstrap driver (Fixed unbound variable + clean logic)
 # =============================================================================
 
 set -euo pipefail
@@ -49,6 +49,8 @@ FORCE_FRESH=false
 TEST_MODE=false
 TEST_DISTRO="alpine"
 SKIP_CLEAN_SLATE=false
+UPDATE_FILC_ONLY=false
+RECOVER_LC=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -66,7 +68,9 @@ while [[ $# -gt 0 ]]; do
             echo "  --test-alpine       Fast test with Alpine"
             echo "  --clean-slate       Full Gentoo stage 3 build"
             echo "  --fresh             Ignore checkpoints"
-            echo "  --skip-clean-slate  Skip Phase 00 (use when already in chroot)"
+            echo "  --skip-clean-slate  Skip Phase 00 (used internally)"
+            echo "  --update-filc       Only update Fil-C toolchain"
+            echo "  --recover-lc        Recover LC phase only"
             exit 0
             ;;
         *)
@@ -80,26 +84,27 @@ done
 log "filc-bootstrap started"
 log_config
 
-# If we are told to skip clean slate, run the inner phases directly
+# If we are inside chroot and told to skip Phase 00
 if [[ "$SKIP_CLEAN_SLATE" == "true" ]]; then
-    log "Skipping Phase 00 (--skip-clean-slate)"
-    log "Running inner bootstrap phases directly..."
-    
+    log "Skipping Phase 00 (--skip-clean-slate). Running inner phases directly."
+
     if [[ "$UPDATE_FILC_ONLY" == "true" ]]; then
         run_phase "./phases/02-build-filc-toolchain.sh"
+        run_phase "./phases/03-setup-dual-libc.sh"
+    elif [[ "$RECOVER_LC" == "true" ]]; then
         run_phase "./phases/03-setup-dual-libc.sh"
     else
         run_phase "./phases/01-prepare-base.sh"
         run_phase "./phases/02-build-filc-toolchain.sh"
         run_phase "./phases/03-setup-dual-libc.sh"
         run_phase "./phases/03.5-test-hello-world.sh"
-        
-        if [[ -f /etc/gentoo-release ]]; then
+
+        if [[ -f /etc/gentoo-release && "$SKIP_GENTOO_BRIDGE" != "true" ]]; then
             run_phase "./phases/04-gentoo-bridge.sh"
         fi
     fi
 
-    log "Bootstrap completed (skipped Phase 00)"
+    log "Bootstrap completed successfully (inner phases only)"
     exit 0
 fi
 
