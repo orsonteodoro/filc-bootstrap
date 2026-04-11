@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Option 1: Alpine minirootfs + Gentoo stage 3)
-# Purpose: Create uncontaminated, hermetic, reproducible environment
+# Phase 00 - Setup Clean Slate (Fixed for Alpine minirootfs + bash)
+# Purpose: Create clean, hermetic, reproducible environment
 # =============================================================================
 
 set -euo pipefail
@@ -13,57 +13,58 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Hermetic Slate Setup (Minirootfs)"
+log "Starting Phase 00: Clean Hermetic Slate Setup"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
 TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 
-# Reproducible URLs
 ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-# Safety check
+mkdir -p "$TARGET_ROOT"
+
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — wiping $TARGET_ROOT"
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
-        log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
+        log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
     rm -rf "$TARGET_ROOT"/*
 fi
 
-mkdir -p "$TARGET_ROOT"
-
-# ====================== Alpine Minirootfs (Clean & Hermetic) ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Using Alpine minirootfs for clean hermetic test environment"
+    log "Using Alpine minirootfs for clean hermetic test"
 
     MINIROOTFS_FILE="/tmp/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
     if [[ ! -f "$MINIROOTFS_FILE" ]]; then
-        log "Downloading Alpine minirootfs for reproducibility..."
+        log "Downloading Alpine minirootfs..."
         wget -c -O "$MINIROOTFS_FILE" "$ALPINE_MINIROOTFS_URL"
-    else
-        log "Using cached minirootfs: $MINIROOTFS_FILE"
     fi
 
-    log "Unpacking clean Alpine minirootfs into $TARGET_ROOT..."
+    log "Unpacking Alpine minirootfs..."
     tar -xzf "$MINIROOTFS_FILE" -C "$TARGET_ROOT"
 
-    # Setup APK repositories
+    # Setup repositories
     mkdir -p "$TARGET_ROOT/etc/apk"
     cat > "$TARGET_ROOT/etc/apk/repositories" <<EOF
 http://dl-cdn.alpinelinux.org/alpine/v3.23/main
 http://dl-cdn.alpinelinux.org/alpine/v3.23/community
 EOF
 
-    log "✅ Alpine minirootfs unpacked successfully (hermetic base ready)."
+    # Install bash and other essential tools **before** chroot
+    log "Installing bash and build tools into minirootfs..."
+    apk --root "$TARGET_ROOT" --no-cache add \
+        bash git curl wget \
+        build-base clang cmake ninja patchelf rsync tar
 
-# ====================== Gentoo Stage 3 (for real builds) ======================
+    log "✅ Alpine minirootfs ready with bash and tools."
+
 else
-    log "Setting up clean Gentoo stage 3 (hermetic full build)"
+    # Gentoo stage 3
+    log "Setting up clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     LATEST_FILE="latest-stage3-amd64.txt"
     STAGE3_PROFILE="stage3-amd64"
@@ -73,7 +74,7 @@ else
 
     STAGE3_TARBALL=$(grep -E "${STAGE3_PROFILE}-.*\.tar\.xz$" latest-stage3.txt | awk '{print $1}' | tail -n1)
     if [[ -z "$STAGE3_TARBALL" ]]; then
-        log "ERROR: Could not find Gentoo stage 3 tarball"
+        log "ERROR: Could not find Gentoo stage 3"
         exit 1
     fi
 
@@ -88,9 +89,8 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Common Chroot Setup ======================
+# ====================== Common Setup ======================
 log "Setting up chroot mounts and DNS..."
-
 mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
 mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
 mount --make-rslave "$TARGET_ROOT/sys" 2>/dev/null || true
