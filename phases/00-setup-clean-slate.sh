@@ -128,9 +128,24 @@ mount --bind /run "$TARGET_ROOT/run" 2>/dev/null || true
 cp --dereference /etc/resolv.conf "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
 chmod 644 "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
 
-log "Copying filc-bootstrap scripts into chroot..."
+log "Copying filc-bootstrap scripts into chroot (reliable method)..."
+
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
-cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+
+# More reliable copy - use rsync if available, fallback to cp
+if command -v rsync >/dev/null; then
+    rsync -a --delete "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" || true
+else
+    cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" || true
+fi
+
+# Extra safety: make sure key files are present
+if [[ ! -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
+    log "WARNING: bootstrap.sh not copied. Doing direct copy..."
+    cp -r "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+fi
+
+log "filc-bootstrap scripts copied into chroot."
 
 log "Chrooting into clean hermetic environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
