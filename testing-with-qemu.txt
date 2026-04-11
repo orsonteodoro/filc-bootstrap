@@ -30,6 +30,7 @@ setup-alpine
 # Networking → use DHCP (default is fine)
 # Disk → choose sda (or vda), use sys mode (full disk install)
 
+sync
 # Shutdown vm
 
 # Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
@@ -45,7 +46,7 @@ qemu-system-x86_64 \
 chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
-# Update and install basic tools
+# Update available packages list and install git to download filc-bootstrap
 apk update
 apk add git bash curl wget build-base clang cmake ninja patchelf
 
