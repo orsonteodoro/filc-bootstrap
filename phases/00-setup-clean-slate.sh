@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Gentle & Resilient --fresh handling)
+# Phase 00 - Setup Clean Slate (with dummy file verification)
 # =============================================================================
 
 set -euo pipefail
@@ -22,45 +22,35 @@ ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-# ====================== Safe & Gentle Fresh Wipe ======================
+# ====================== Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
 
-    # Strong safety guard
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" || -z "$TARGET_ROOT" ]]; then
-        log "ERROR: Refusing to wipe dangerous or empty path: $TARGET_ROOT"
+        log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
 
-    log "Unmounting filesystems under $TARGET_ROOT (gentle approach)..."
-
-    # Try gentle unmount first
+    log "Unmounting filesystems under $TARGET_ROOT..."
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
-            log "Unmounting $TARGET_ROOT/$dir"
             umount "$TARGET_ROOT/$dir" 2>/dev/null || true
         fi
     done
 
-    # If still mounted, use lazy unmount (doesn't block)
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
-            log "Lazy unmounting $TARGET_ROOT/$dir"
             umount -l "$TARGET_ROOT/$dir" 2>/dev/null || true
         fi
     done
 
-    # Final aggressive cleanup
-    log "Final cleanup of target directory..."
+    log "Wiping target directory..."
     rm -rf "$TARGET_ROOT"/* 2>/dev/null || true
-    rm -rf "$TARGET_ROOT"/.[!.]* "$TARGET_ROOT"/..?* 2>/dev/null || true
-
-    log "Target directory wiped successfully."
 fi
 
 mkdir -p "$TARGET_ROOT"
 
-# ====================== Alpine Minirootfs (rest of the file remains the same) ======================
+# ====================== Alpine Minirootfs ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
     log "Using Alpine minirootfs for clean hermetic test"
 
@@ -87,7 +77,6 @@ EOF
 
     log "✅ Alpine minirootfs ready with bash and tools."
 
-# ====================== Gentoo Stage 3 ======================
 else
     log "Setting up clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
@@ -114,9 +103,24 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# (The rest of the file - common setup, mounts, chroot - remains the same as before)
-# ... [keep the rest of your file from the common setup down]
+# ====================== Bind Mount Bootstrap Scripts (Reliable) ======================
+log "Bind-mounting filc-bootstrap scripts into chroot..."
 
+mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
+
+# Bind mount the entire bootstrap directory from host
+mount --bind "$SCRIPT_DIR/.." "$TARGET_ROOT/root/filc-bootstrap"
+
+# Create a dummy file to verify the mount works
+echo "This is a test file created on host at $(date)" > "$SCRIPT_DIR/../DUMMY_TEST_FILE.txt"
+
+if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
+    log "✅ Dummy file test passed - scripts are visible inside chroot"
+else
+    log "WARNING: Dummy file test failed. Bind mount may not be working."
+fi
+
+# ====================== Common Setup ======================
 log "Setting up chroot mounts and DNS..."
 mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
 mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
@@ -128,45 +132,30 @@ mount --bind /run "$TARGET_ROOT/run" 2>/dev/null || true
 cp --dereference /etc/resolv.conf "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
 chmod 644 "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
 
-log "Binding filc-bootstrap scripts into chroot (reliable method)..."
-
-# Create the target directory inside chroot
-mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
-
-# Bind mount the host's bootstrap directory into the chroot
-# This is the most reliable way - no copying needed
-mount --bind "$SCRIPT_DIR/.." "$TARGET_ROOT/root/filc-bootstrap"
-
-# Also bind the sources directory to make sure
-mkdir -p "$TARGET_ROOT/root/filc-bootstrap/sources"
-if [[ -d "$SCRIPT_DIR/../sources" ]]; then
-    mount --bind "$SCRIPT_DIR/../sources" "$TARGET_ROOT/root/filc-bootstrap/sources" 2>/dev/null || true
-fi
-
-log "filc-bootstrap scripts bind-mounted into chroot."
-
-log "Verifying scripts are visible inside chroot..."
-if [[ ! -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
-    log "ERROR: bootstrap.sh not visible inside chroot after bind mount!"
-    ls -la "$TARGET_ROOT/root/filc-bootstrap/"
-    exit 1
-fi
-
 log "Chrooting into clean hermetic environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     set -euo pipefail
 
-    # Double-check we are in the right place
-    if [[ ! -f /root/filc-bootstrap/bootstrap.sh ]]; then
-        echo "ERROR: bootstrap.sh not found inside chroot!"
-        ls -la /root/filc-bootstrap/
-        exit 1
-    fi
-
     cd /root/filc-bootstrap
+
     echo "=== Now running inside clean hermetic chroot ==="
     echo "Current directory: $(pwd)"
     ls -la
+
+    # Verify dummy file and bootstrap script
+    if [[ -f DUMMY_TEST_FILE.txt ]]; then
+        echo "✅ Dummy file test passed inside chroot"
+    else
+        echo "WARNING: Dummy file not visible inside chroot"
+    fi
+
+    if [[ -f bootstrap.sh ]]; then
+        echo "✅ bootstrap.sh found inside chroot"
+    else
+        echo "ERROR: bootstrap.sh not found inside chroot!"
+        ls -la
+        exit 1
+    fi
 
     exec ./bootstrap.sh --skip-clean-slate "$@"
 CHROOT_EOF
