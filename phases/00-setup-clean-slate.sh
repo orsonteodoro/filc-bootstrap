@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Aggressive safe unmount + wipe)
+# Phase 00 - Setup Clean Slate (Gentle & Resilient --fresh handling)
 # =============================================================================
 
 set -euo pipefail
@@ -22,7 +22,7 @@ ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-# ====================== Aggressive Safe Unmount + Wipe ======================
+# ====================== Safe & Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
 
@@ -32,28 +32,35 @@ if [[ "$FORCE_FRESH" == "true" ]]; then
         exit 1
     fi
 
-    log "Unmounting all filesystems under $TARGET_ROOT..."
-    
-    # Aggressive unmount (recursive + lazy)
+    log "Unmounting filesystems under $TARGET_ROOT (gentle approach)..."
+
+    # Try gentle unmount first
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
             log "Unmounting $TARGET_ROOT/$dir"
-            umount -R -l "$TARGET_ROOT/$dir" 2>/dev/null || true
+            umount "$TARGET_ROOT/$dir" 2>/dev/null || true
         fi
     done
 
-    # Extra cleanup for any leftover mounts
-    mount | grep "$TARGET_ROOT" | awk '{print $3}' | while read -r mnt; do
-        umount -l "$mnt" 2>/dev/null || true
+    # If still mounted, use lazy unmount (doesn't block)
+    for dir in proc sys dev run; do
+        if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
+            log "Lazy unmounting $TARGET_ROOT/$dir"
+            umount -l "$TARGET_ROOT/$dir" 2>/dev/null || true
+        fi
     done
 
-    log "Wiping target directory..."
-    rm -rf "$TARGET_ROOT"/* "$TARGET_ROOT"/.[!.]* "$TARGET_ROOT"/..?* 2>/dev/null || true
+    # Final aggressive cleanup
+    log "Final cleanup of target directory..."
+    rm -rf "$TARGET_ROOT"/* 2>/dev/null || true
+    rm -rf "$TARGET_ROOT"/.[!.]* "$TARGET_ROOT"/..?* 2>/dev/null || true
+
+    log "Target directory wiped successfully."
 fi
 
 mkdir -p "$TARGET_ROOT"
 
-# ====================== Alpine Minirootfs ======================
+# ====================== Alpine Minirootfs (rest of the file remains the same) ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
     log "Using Alpine minirootfs for clean hermetic test"
 
@@ -107,7 +114,9 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Common Setup ======================
+# (The rest of the file - common setup, mounts, chroot - remains the same as before)
+# ... [keep the rest of your file from the common setup down]
+
 log "Setting up chroot mounts and DNS..."
 mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
 mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
