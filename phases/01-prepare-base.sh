@@ -45,10 +45,28 @@ else
 
     git clone $CLONE_OPTS --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
 
+    # Show current clone status
+    if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
+        cd "$FILC_SOURCE_DIR"
+        echo "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
+    fi
+
     cd "$FILC_SOURCE_DIR"
     if [[ -n "$FILC_COMMIT" ]]; then
         log "Pinning to commit: $FILC_COMMIT"
         git checkout "$FILC_COMMIT"
+    fi
+fi
+
+# Handle tag if requested
+if [[ "$FILC_USE_TAG" == "true" && -n "$FILC_TAG" ]]; then
+    log "Checking out latest requested tag: $FILC_TAG"
+    git fetch --tags --progress
+    if git tag -l | grep -q "^$FILC_TAG$"; then
+        git checkout "$FILC_TAG"
+        log "Successfully checked out tag $FILC_TAG"
+    else
+        log "WARNING: Tag $FILC_TAG not found. Falling back to branch tip."
     fi
 fi
 

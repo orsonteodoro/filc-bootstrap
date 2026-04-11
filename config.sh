@@ -13,9 +13,11 @@ export FILC_BRANCH="deluge"
 #
 # For system-wide / daily use:
 #   Use "latest" or a recent stable tag if available.
-#export FILC_COMMIT=""                          # Leave empty to use tip of branch
+export FILC_COMMIT=""                    # Leave empty for latest on branch
+export FILC_TAG="v0.678"                       # e.g. "v0.678" if a tag exists
 #export FILC_COMMIT="39ee664dbf0b7db841ae05269201e757447290ee" # deluge snapshot, Mar 27, 2026, LLVM 20.1.8
 export FILC_COMMIT="8122d8c2d7cff174c30041c0f7542d57feaecc3d" # v0.678, Feb 10, 2026, LLVM 20.1.8
+export FILC_USE_TAG=false                # Set to true if using FILC_TAG
 
 # Alternative: Use latest tag (less reproducible but more "stable")
 # export FILC_USE_LATEST_TAG=true
@@ -60,12 +62,20 @@ log_config() {
     echo "Fil-C branch     : ${FILC_BRANCH}"
     if [[ -n "${FILC_COMMIT}" ]]; then
         echo "Fil-C commit     : ${FILC_COMMIT} (pinned)"
+    elif [[ -n "${FILC_TAG}" && "${FILC_USE_TAG}" == "true" ]]; then
+        echo "Fil-C tag        : ${FILC_TAG}"
     else
-        echo "Fil-C commit     : tip of ${FILC_BRANCH} (not pinned)"
+        echo "Fil-C commit     : tip of ${FILC_BRANCH}"
     fi
     echo "Fil-C libc       : ${FILC_LIBC}"
     echo "Fil-C prefix     : ${FILC_PREFIX}"
-    echo "Test mode        : ${TEST_MODE} (${TEST_DISTRO})"
+
+    if [[ "$TEST_MODE" == "true" ]]; then
+        echo "Test mode        : ENABLED (${TEST_DISTRO})"
+    else
+        echo "Test mode        : DISABLED (using Gentoo stage 3)"
+    fi
+
     echo "MAKEOPTS         : ${MAKEOPTS}"
     echo "====================================="
 }
