@@ -1,11 +1,11 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Clean cp -aT version)
+# Phase 00 - Setup Clean Slate (Simple reliable copy - final version)
 # =============================================================================
 
 set -euo pipefail
 
-# Calculate host paths BEFORE anything else
+# Calculate host paths VERY EARLY, before any chroot or wipe
 HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
 HOST_BOOTSTRAP_PATH="$(cd "$HOST_SCRIPT_DIR/.." && pwd)"
 
@@ -107,13 +107,15 @@ log "Copying filc-bootstrap scripts into chroot using cp -aT..."
 
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-# cp -aT treats the source as the directory itself (no extra nesting)
+# Use cp -aT from the known good host path
+log "Copying from: $HOST_BOOTSTRAP_PATH"
+
 cp -aT "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap" || {
-    log "WARNING: cp -aT failed, trying fallback..."
+    log "cp -aT failed, trying fallback copy..."
     cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 }
 
-# Verify
+# Final verification
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
     log "✅ bootstrap.sh copied successfully into chroot"
 else
