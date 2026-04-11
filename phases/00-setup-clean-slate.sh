@@ -1,6 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Robust Alpine fix - April 2026)
+# Phase 00 - Setup Clean Slate (ISO-based approach)
+# Mounts/unpacks ISO or stage3 directly for a true clean environment
 # =============================================================================
 
 set -euo pipefail
@@ -12,77 +13,63 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
 }
 
-log "Starting Phase 00: Clean Slate / Chroot Setup"
+log "Starting Phase 00: Clean Slate Setup (ISO-based)"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
-TEST_DISTRO=${TEST_DISTRO:-"debian"}
+TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 
-log "Target root: $TARGET_ROOT | Test mode: $TEST_MODE ($TEST_DISTRO)"
+log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-mkdir -p "$TARGET_ROOT"
-
+# Safety guard
 if [[ "$FORCE_FRESH" == "true" ]]; then
-    log "Force fresh enabled — wiping $TARGET_ROOT"
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
         log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
         exit 1
     fi
+    log "Force fresh enabled — wiping $TARGET_ROOT"
     rm -rf "$TARGET_ROOT"/*
 fi
 
-# ====================== Alpine Test Mode (More Robust) ======================
+mkdir -p "$TARGET_ROOT"
+
+# ====================== Alpine ISO-based Clean Slate ======================
 if [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "alpine" ]]; then
-    log "Creating Alpine test chroot (robust method)..."
+    log "Setting up Alpine clean slate from ISO..."
 
-    # Current stable apk-tools-static as of 2026
-    APK_STATIC_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/apk-tools-static-3.0.5-r0.apk"
+    ISO_PATH="${ISO_PATH:-~/qemu-alpine/alpine-standard-*.iso}"
 
-    log "Downloading apk-tools-static..."
-    wget -q --show-progress -O /tmp/apk-tools-static.apk "$APK_STATIC_URL"
+    if ls $ISO_PATH 1> /dev/null 2>&1; then
+        ISO_FILE=$(ls $ISO_PATH | head -n1)
+        log "Found Alpine ISO: $ISO_FILE"
 
-    if [[ ! -s /tmp/apk-tools-static.apk ]]; then
-        log "ERROR: Failed to download apk-tools-static"
+        # Mount ISO
+        mkdir -p /mnt/alpine-iso
+        mount -o loop "$ISO_FILE" /mnt/alpine-iso
+
+        # Copy root filesystem from ISO (live environment)
+        log "Copying Alpine live root to $TARGET_ROOT..."
+        rsync -a --exclude=/dev --exclude=/proc --exclude=/sys --exclude=/run /mnt/alpine-iso/ "$TARGET_ROOT/" || true
+
+        umount /mnt/alpine-iso
+        rmdir /mnt/alpine-iso
+    else
+        log "ERROR: Alpine ISO not found at $ISO_PATH"
+        log "Please place the Alpine standard ISO in ~/qemu-alpine/ or set ISO_PATH"
         exit 1
     fi
 
-    log "Extracting apk.static..."
-    tar -xzf /tmp/apk-tools-static.apk -C /tmp --wildcards 'sbin/apk.static' --strip-components=1
-
-    mv /tmp/apk.static /usr/bin/apk.static
-    chmod +x /usr/bin/apk.static
-
-    log "Bootstrapping minimal Alpine root..."
-    /usr/bin/apk.static --root "$TARGET_ROOT" --initdb --no-cache --allow-untrusted add alpine-base
-
-    # Setup repositories
-    mkdir -p "$TARGET_ROOT/etc/apk"
-    cat > "$TARGET_ROOT/etc/apk/repositories" <<EOF
-http://dl-cdn.alpinelinux.org/alpine/v3.23/main
-http://dl-cdn.alpinelinux.org/alpine/v3.23/community
-EOF
-
-    # Update index and install remaining packages
-    log "Updating package index and installing tools..."
-    apk --root "$TARGET_ROOT" --no-cache update
-
-    apk --root "$TARGET_ROOT" --no-cache add \
-        bash git curl wget \
-        build-base clang cmake ninja patchelf rsync tar
-
-    log "✅ Alpine chroot successfully bootstrapped with all required packages."
-
-# ====================== Debian Test Mode ======================
+# ====================== Debian (keep debootstrap for now) ======================
 elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
-    log "Creating Debian test chroot using debootstrap..."
+    log "Creating Debian clean slate using debootstrap..."
     if ! command -v debootstrap >/dev/null; then
         apt-get update && apt-get install -y debootstrap
     fi
     debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
 
-# ====================== Gentoo Default ======================
+# ====================== Gentoo Stage 3 (original) ======================
 else
-    log "Creating clean Gentoo stage 3..."
+    log "Creating clean Gentoo stage 3 from official tarball..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     LATEST_FILE="latest-stage3-amd64.txt"
     STAGE3_PROFILE="stage3-amd64"
@@ -108,7 +95,7 @@ else
 fi
 
 # ====================== Common Setup ======================
-log "Setting up mounts and DNS..."
+log "Setting up chroot mounts and DNS..."
 mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
 mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
 mount --make-rslave "$TARGET_ROOT/sys" 2>/dev/null || true
@@ -123,11 +110,11 @@ log "Copying filc-bootstrap scripts into chroot..."
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 
-log "Chrooting into environment..."
+log "Chrooting into clean environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     set -euo pipefail
     cd /root/filc-bootstrap
-    echo "=== Now running inside chroot ==="
+    echo "=== Now running inside clean chroot ==="
     exec ./bootstrap.sh --skip-clean-slate "$@"
 CHROOT_EOF
 
