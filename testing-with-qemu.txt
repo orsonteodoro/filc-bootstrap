@@ -45,6 +45,19 @@ qemu-system-x86_64 \
 chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
+# Update and install basic tools
+apk update
+apk add git bash curl wget build-base clang cmake ninja patchelf
+
+# Create a working directory
+mkdir -p ~/filc-test
+cd ~/filc-test
+
+# Copy your filc-bootstrap repo into the VM
+# (easiest way: use scp from host, or git clone inside)
+git clone https://github.com/orsonteodoro/filc-bootstrap.git
+cd filc-bootstrap
+
 # Inside the Alpine guest
 chmod +x ./setup-alpine-guest-filc-test.sh
 ./setup-alpine-guest-filc-test.sh
