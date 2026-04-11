@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Safe --fresh with unmount)
+# Phase 00 - Setup Clean Slate (Aggressive safe unmount + wipe)
 # =============================================================================
 
 set -euo pipefail
@@ -22,25 +22,33 @@ ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-# ====================== Safety: Unmount before fresh wipe ======================
+# ====================== Aggressive Safe Unmount + Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
 
-    # Strong safety check
-    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
-        log "ERROR: Refusing to wipe dangerous path: $TARGET_ROOT"
+    # Strong safety guard
+    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" || -z "$TARGET_ROOT" ]]; then
+        log "ERROR: Refusing to wipe dangerous or empty path: $TARGET_ROOT"
         exit 1
     fi
 
-    log "Unmounting any active mounts in $TARGET_ROOT..."
+    log "Unmounting all filesystems under $TARGET_ROOT..."
+    
+    # Aggressive unmount (recursive + lazy)
     for dir in proc sys dev run; do
-        if mountpoint -q "$TARGET_ROOT/$dir"; then
+        if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
+            log "Unmounting $TARGET_ROOT/$dir"
             umount -R -l "$TARGET_ROOT/$dir" 2>/dev/null || true
         fi
     done
 
+    # Extra cleanup for any leftover mounts
+    mount | grep "$TARGET_ROOT" | awk '{print $3}' | while read -r mnt; do
+        umount -l "$mnt" 2>/dev/null || true
+    done
+
     log "Wiping target directory..."
-    rm -rf "$TARGET_ROOT"/*
+    rm -rf "$TARGET_ROOT"/* "$TARGET_ROOT"/.[!.]* "$TARGET_ROOT"/..?* 2>/dev/null || true
 fi
 
 mkdir -p "$TARGET_ROOT"
@@ -70,7 +78,7 @@ EOF
         bash git curl wget \
         build-base clang cmake ninja patchelf rsync tar
 
-    log "✅ Alpine minirootfs ready with bash."
+    log "✅ Alpine minirootfs ready with bash and tools."
 
 # ====================== Gentoo Stage 3 ======================
 else
