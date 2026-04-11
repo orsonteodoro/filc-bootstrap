@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (with dummy file verification)
+# Phase 00 - Setup Clean Slate (Strong diagnostics + bind mount)
 # =============================================================================
 
 set -euo pipefail
@@ -22,16 +22,14 @@ ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
 
-# ====================== Gentle Fresh Wipe ======================
+# Gentle fresh wipe
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
-
-    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" || -z "$TARGET_ROOT" ]]; then
+    if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
         log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
 
-    log "Unmounting filesystems under $TARGET_ROOT..."
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
             umount "$TARGET_ROOT/$dir" 2>/dev/null || true
@@ -44,7 +42,6 @@ if [[ "$FORCE_FRESH" == "true" ]]; then
         fi
     done
 
-    log "Wiping target directory..."
     rm -rf "$TARGET_ROOT"/* 2>/dev/null || true
 fi
 
@@ -72,11 +69,9 @@ EOF
 
     log "Installing bash and build tools..."
     apk --root "$TARGET_ROOT" --no-cache add \
-        bash git curl wget \
-        build-base clang cmake ninja patchelf rsync tar
+        bash git curl wget build-base clang cmake ninja patchelf rsync tar
 
-    log "✅ Alpine minirootfs ready with bash and tools."
-
+# Gentoo fallback
 else
     log "Setting up clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
@@ -103,60 +98,64 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Bind Mount Bootstrap Scripts (Reliable) ======================
-log "Bind-mounting filc-bootstrap scripts into chroot..."
+# ====================== Strong Bind Mount with Diagnostics ======================
+log "Setting up bind mount for filc-bootstrap scripts..."
 
+# Ensure target directory exists
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-# Bind mount the entire bootstrap directory from host
+# Bind mount the host bootstrap directory directly to /root/filc-bootstrap inside chroot
 mount --bind "$SCRIPT_DIR/.." "$TARGET_ROOT/root/filc-bootstrap"
 
-# Create a dummy file to verify the mount works
-echo "This is a test file created on host at $(date)" > "$SCRIPT_DIR/../DUMMY_TEST_FILE.txt"
+# Create dummy file on host
+DUMMY_FILE="$SCRIPT_DIR/../DUMMY_TEST_FILE.txt"
+echo "Dummy test file created on host at $(date)" > "$DUMMY_FILE"
 
+log "Dummy file created at $DUMMY_FILE"
+
+# Check if it's visible inside the chroot path
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
-    log "✅ Dummy file test passed - scripts are visible inside chroot"
+    log "✅ Dummy file is visible inside chroot via bind mount"
 else
-    log "WARNING: Dummy file test failed. Bind mount may not be working."
+    log "WARNING: Dummy file NOT visible inside chroot"
+    log "Falling back to direct copy..."
+    cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 fi
 
-# ====================== Common Setup ======================
-log "Setting up chroot mounts and DNS..."
-mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
-mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
-mount --make-rslave "$TARGET_ROOT/sys" 2>/dev/null || true
-mount --rbind /dev "$TARGET_ROOT/dev" 2>/dev/null || true
-mount --make-rslave "$TARGET_ROOT/dev" 2>/dev/null || true
-mount --bind /run "$TARGET_ROOT/run" 2>/dev/null || true
+# Final verification
+if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
+    log "✅ bootstrap.sh is visible inside chroot"
+else
+    log "ERROR: bootstrap.sh is STILL not visible inside chroot"
+    ls -la "$TARGET_ROOT/root/filc-bootstrap/"
+    exit 1
+fi
 
-cp --dereference /etc/resolv.conf "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
-chmod 644 "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
+# ====================== Chroot with diagnostics ======================
+log "Chrooting into clean environment..."
 
-log "Chrooting into clean hermetic environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     set -euo pipefail
 
     cd /root/filc-bootstrap
 
-    echo "=== Now running inside clean hermetic chroot ==="
+    echo "=== Inside chroot diagnostics ==="
     echo "Current directory: $(pwd)"
     ls -la
 
-    # Verify dummy file and bootstrap script
-    if [[ -f DUMMY_TEST_FILE.txt ]]; then
-        echo "✅ Dummy file test passed inside chroot"
-    else
-        echo "WARNING: Dummy file not visible inside chroot"
-    fi
-
     if [[ -f bootstrap.sh ]]; then
-        echo "✅ bootstrap.sh found inside chroot"
+        echo "✅ bootstrap.sh FOUND"
     else
-        echo "ERROR: bootstrap.sh not found inside chroot!"
-        ls -la
+        echo "ERROR: bootstrap.sh NOT FOUND!"
+        ls -la /root/filc-bootstrap/
         exit 1
     fi
 
+    if [[ -f DUMMY_TEST_FILE.txt ]]; then
+        echo "✅ Dummy file visible inside chroot"
+    fi
+
+    echo "Starting main bootstrap..."
     exec ./bootstrap.sh --skip-clean-slate "$@"
 CHROOT_EOF
 
