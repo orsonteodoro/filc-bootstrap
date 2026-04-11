@@ -150,8 +150,19 @@ log "filc-bootstrap scripts copied into chroot."
 log "Chrooting into clean hermetic environment..."
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     set -euo pipefail
+
+    # Double-check we are in the right place
+    if [[ ! -f /root/filc-bootstrap/bootstrap.sh ]]; then
+        echo "ERROR: bootstrap.sh not found inside chroot!"
+        ls -la /root/filc-bootstrap/
+        exit 1
+    fi
+
     cd /root/filc-bootstrap
     echo "=== Now running inside clean hermetic chroot ==="
+    echo "Current directory: $(pwd)"
+    ls -la
+
     exec ./bootstrap.sh --skip-clean-slate "$@"
 CHROOT_EOF
 
