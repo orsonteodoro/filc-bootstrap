@@ -6,8 +6,10 @@
 set -euo pipefail
 
 # Calculate host paths VERY EARLY, before any chroot or wipe
-HOST_SCRIPT_DIR=$(realpath $(dirname $(realpath "${BASH_SOURCE[0]}") )"/.." )
-HOST_BOOTSTRAP_PATH=$(realpath "$HOST_SCRIPT_DIR/..")
+HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+HOST_BOOTSTRAP_PATH="$(cd "$HOST_SCRIPT_DIR/.." && pwd)"
+log "HOST_SCRIPT_DIR: ${HOST_SCRIPT_DIR}"
+log "HOST_BOOTSTRAP_PATH: ${HOST_BOOTSTRAP_PATH}"
 
 source "$HOST_SCRIPT_DIR/config.sh"
 
@@ -109,6 +111,7 @@ mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
 # Use cp -aT from the known good host path
 log "Copying from: $HOST_BOOTSTRAP_PATH"
+log "Copying to: $TARGET_ROOT/root/filc-bootstrap"
 
 cp -aT "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap" || {
     log "cp -aT failed, trying fallback copy..."
