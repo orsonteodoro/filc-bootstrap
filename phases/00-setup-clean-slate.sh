@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Strong diagnostics + bind mount)
+# Phase 00 - Setup Clean Slate (Fixed bind mount + diagnostics)
 # =============================================================================
 
 set -euo pipefail
@@ -98,31 +98,34 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Strong Bind Mount with Diagnostics ======================
+# ====================== Strong Bind Mount with Verification ======================
 log "Setting up bind mount for filc-bootstrap scripts..."
 
-# Ensure target directory exists
+# Create the directory inside chroot
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-# Bind mount the host bootstrap directory directly to /root/filc-bootstrap inside chroot
-mount --bind "$SCRIPT_DIR/.." "$TARGET_ROOT/root/filc-bootstrap"
+# Bind mount the **host's** bootstrap directory to the chroot's /root/filc-bootstrap
+# Use the original SCRIPT_DIR from host
+HOST_BOOTSTRAP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+log "Bind mounting host path: $HOST_BOOTSTRAP_DIR → $TARGET_ROOT/root/filc-bootstrap"
+
+mount --bind "$HOST_BOOTSTRAP_DIR" "$TARGET_ROOT/root/filc-bootstrap"
 
 # Create dummy file on host
-DUMMY_FILE="$SCRIPT_DIR/../DUMMY_TEST_FILE.txt"
+DUMMY_FILE="$HOST_BOOTSTRAP_DIR/DUMMY_TEST_FILE.txt"
 echo "Dummy test file created on host at $(date)" > "$DUMMY_FILE"
 
 log "Dummy file created at $DUMMY_FILE"
 
-# Check if it's visible inside the chroot path
+# Verify inside chroot path
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt" ]]; then
-    log "✅ Dummy file is visible inside chroot via bind mount"
+    log "✅ Dummy file is visible inside chroot"
 else
     log "WARNING: Dummy file NOT visible inside chroot"
-    log "Falling back to direct copy..."
-    cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 fi
 
-# Final verification
+# Check for bootstrap.sh
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
     log "✅ bootstrap.sh is visible inside chroot"
 else
@@ -144,7 +147,7 @@ exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     ls -la
 
     if [[ -f bootstrap.sh ]]; then
-        echo "✅ bootstrap.sh FOUND"
+        echo "✅ bootstrap.sh FOUND - proceeding"
     else
         echo "ERROR: bootstrap.sh NOT FOUND!"
         ls -la /root/filc-bootstrap/
@@ -152,7 +155,7 @@ exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
     fi
 
     if [[ -f DUMMY_TEST_FILE.txt ]]; then
-        echo "✅ Dummy file visible inside chroot"
+        echo "✅ Dummy file visible"
     fi
 
     echo "Starting main bootstrap..."
