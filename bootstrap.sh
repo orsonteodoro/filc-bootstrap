@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# filc-bootstrap - Main bootstrap driver (Fixed unbound variable + clean logic)
+# filc-bootstrap - Main bootstrap driver (Fixed test mode parsing)
 # =============================================================================
 
 set -euo pipefail
@@ -44,7 +44,7 @@ run_phase() {
     fi
 }
 
-# ====================== Argument Parsing ======================
+# ====================== Argument Parsing (Fixed) ======================
 FORCE_FRESH=false
 TEST_MODE=false
 TEST_DISTRO="alpine"
@@ -55,7 +55,7 @@ RECOVER_LC=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --fresh)            FORCE_FRESH=true ;;
-        --test)             TEST_MODE=true ;;
+        --test)             TEST_MODE=true; TEST_DISTRO="debian" ;;
         --test-debian)      TEST_MODE=true; TEST_DISTRO="debian" ;;
         --test-alpine)      TEST_MODE=true; TEST_DISTRO="alpine" ;;
         --clean-slate)      TEST_MODE=false ;;
@@ -69,8 +69,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --clean-slate       Full Gentoo stage 3 build"
             echo "  --fresh             Ignore checkpoints"
             echo "  --skip-clean-slate  Skip Phase 00 (used internally)"
-            echo "  --update-filc       Only update Fil-C toolchain"
-            echo "  --recover-lc        Recover LC phase only"
             exit 0
             ;;
         *)
@@ -109,7 +107,7 @@ if [[ "$SKIP_CLEAN_SLATE" == "true" ]]; then
 fi
 
 # Normal flow - start with Phase 00
-log "Starting normal flow with Phase 00"
+log "Starting normal flow with Phase 00 (Test mode: $TEST_MODE, Distro: $TEST_DISTRO)"
 ./phases/00-setup-clean-slate.sh "$@"
 
 exit 0
