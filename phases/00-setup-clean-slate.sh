@@ -1,12 +1,15 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Simple reliable copy method)
+# Phase 00 - Setup Clean Slate (Safe two-step copy method)
 # =============================================================================
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-source "$SCRIPT_DIR/config.sh"
+# Calculate host paths BEFORE anything else
+HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+HOST_BOOTSTRAP_PATH="$(cd "$HOST_SCRIPT_DIR/.." && pwd)"
+
+source "$HOST_SCRIPT_DIR/config.sh"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
@@ -21,15 +24,18 @@ TEST_DISTRO=${TEST_DISTRO:-"alpine"}
 ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
+log "Host bootstrap path: $HOST_BOOTSTRAP_PATH"
 
-# Gentle fresh wipe
+# ====================== Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
+
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" ]]; then
         log "ERROR: Refusing to wipe dangerous path"
         exit 1
     fi
 
+    log "Unmounting filesystems under $TARGET_ROOT..."
     for dir in proc sys dev run; do
         if mountpoint -q "$TARGET_ROOT/$dir" 2>/dev/null; then
             umount "$TARGET_ROOT/$dir" 2>/dev/null || true
@@ -42,6 +48,7 @@ if [[ "$FORCE_FRESH" == "true" ]]; then
         fi
     done
 
+    log "Wiping target directory..."
     rm -rf "$TARGET_ROOT"/* 2>/dev/null || true
 fi
 
@@ -98,30 +105,32 @@ else
 fi
 
 # ====================== Reliable Copy of Bootstrap Scripts ======================
-log "Copying filc-bootstrap scripts into chroot (reliable copy method)..."
+log "Copying filc-bootstrap scripts into chroot (safe method)..."
 
-# Use rsync if available, fallback to cp
+# Copy from the known good host path
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-if command -v rsync >/dev/null; then
-    rsync -a --delete "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" || true
-else
-    cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" || true
-fi
+log "Copying from host path: $HOST_BOOTSTRAP_PATH"
 
-# Extra safety copy
-cp -a "$SCRIPT_DIR"/.. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+
+# Fallback copy if cp -a fails
+if [[ ! -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
+    log "Fallback copy using rsync or cp..."
+    rsync -a "$HOST_BOOTSTRAP_PATH"/ "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+    cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+fi
 
 # Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
     log "✅ bootstrap.sh copied successfully into chroot"
 else
-    log "ERROR: bootstrap.sh still not found after copy"
+    log "ERROR: bootstrap.sh still not found after copy attempts"
     ls -la "$TARGET_ROOT/root/filc-bootstrap/"
     exit 1
 fi
 
-# Create dummy file
+# Create dummy file inside chroot
 echo "Dummy test file created at $(date)" > "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt"
 log "Dummy file created inside chroot"
 
