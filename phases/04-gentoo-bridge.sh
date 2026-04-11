@@ -41,7 +41,7 @@ if [[ -d "$OVERLAY_DIR" ]]; then
 else
     log "Cloning filc-overlay..."
     mkdir -p /var/db/repos
-    git clone https://github.com/YOURUSERNAME/filc-overlay.git "$OVERLAY_DIR" || {
+    git clone https://github.com/orsonteodoro/filc-overlay.git "$OVERLAY_DIR" || {
         log "WARNING: Could not clone filc-overlay. Please add it manually."
     }
 fi
