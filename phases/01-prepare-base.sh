@@ -24,60 +24,36 @@ cd /root/filc-bootstrap || {
 # ====================== Git Cache Setup (for faster repeats) ======================
 mkdir -p "$GIT_CACHE_DIR"
 
-# ====================== Clone / Update Fil-C with progress ======================
-log "Setting up Fil-C at $FILC_SOURCE_DIR"
+# ====================== Clone / Update Fil-C ======================
+log "Setting up Fil-C source at $FILC_SOURCE_DIR"
 
 if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
     log "Updating existing Fil-C repository..."
     cd "$FILC_SOURCE_DIR"
     git fetch --progress origin
     git checkout "$FILC_BRANCH"
-    if [[ -n "$FILC_COMMIT" ]]; then
-        git checkout "$FILC_COMMIT"
-    fi
-    git pull --ff-only --progress || true
 else
-    log "Cloning Fil-C repository (this may take a while on first run)..."
+    log "Cloning Fil-C repository (first time may take a while)..."
     mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
-
-    CLONE_OPTS="--progress"
-    [[ "$GIT_SHALLOW" == "true" ]] && CLONE_OPTS="$CLONE_OPTS --depth 1"
-
-    git clone $CLONE_OPTS --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
-
-    # Show current clone status
-    if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
-        cd "$FILC_SOURCE_DIR"
-        echo "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
-    fi
-
+    git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
     cd "$FILC_SOURCE_DIR"
-    if [[ -n "$FILC_COMMIT" ]]; then
-        log "Pinning to commit: $FILC_COMMIT"
-        git checkout "$FILC_COMMIT"
-    fi
 fi
 
-# Handle tag if requested
-if [[ "$FILC_USE_TAG" == "true" && -n "$FILC_TAG" ]]; then
-    log "Checking out latest requested tag: $FILC_TAG"
-    git fetch --tags --progress
-    if git tag -l | grep -q "^$FILC_TAG$"; then
-        git checkout "$FILC_TAG"
-        log "Successfully checked out tag $FILC_TAG"
-    else
-        log "WARNING: Tag $FILC_TAG not found. Falling back to branch tip."
-    fi
+# Pin to specific commit if set
+if [[ -n "$FILC_COMMIT" ]]; then
+    log "Pinning to commit: $FILC_COMMIT"
+    git checkout "$FILC_COMMIT"
+    log "Successfully checked out commit $FILC_COMMIT"
 fi
 
-# Verify clone succeeded
+# Final check
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "ERROR: Fil-C build scripts not found after clone!"
+    log "ERROR: Fil-C build scripts not found!"
     exit 1
 fi
 
-log "Fil-C source ready at $FILC_SOURCE_DIR"
-log "Current commit: $(git rev-parse --short HEAD) ($(git log -1 --format=%s))"
+log "Fil-C source ready."
+log "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
 
 # ====================== Rest of Phase 01 (dependencies) ======================
 log "Installing build dependencies..."
