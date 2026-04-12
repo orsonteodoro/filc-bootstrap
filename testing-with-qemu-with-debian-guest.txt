@@ -38,7 +38,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 6 \
   -nic user,model=virtio \
-  -drive file=debian12.qcow2,format=qcow2,if=virtio \
+  -drive file=debian.qcow2,format=qcow2,if=virtio \
   -display gtk \
   -vga virtio \
   -usb -device usb-tablet \
