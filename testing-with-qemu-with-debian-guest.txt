@@ -49,13 +49,10 @@ chmod +x setup2.sh
 
 # In the Debian guest:
 
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl wget build-essential ca-certificates
-
-git clone https://github.com/orsonteodoro/filc-bootstrap.git
-cd filc-bootstrap
-
-chmod +x bootstrap.sh phases/*.sh
+# Download dependencies and filc-bootstrap with
+chmod +x setup-debian-guest-filc-test.sh
+./setup-debian-guest-filc-test.sh
 
 # Run the test
+cd filc-bootstrap
 ./bootstrap.sh --test-debian --fresh
