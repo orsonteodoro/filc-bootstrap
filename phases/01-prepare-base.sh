@@ -99,6 +99,7 @@ log "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
 log "Installing build dependencies..."
 
 if [[ "$DISTRO" == "alpine" ]]; then
+    log "Alpine detected - installing packages with apk..."
     apk add --no-cache \
         bash git curl wget ca-certificates \
         build-base clang clang-dev llvm llvm-dev llvm-static llvm-libs \
@@ -109,44 +110,39 @@ if [[ "$DISTRO" == "alpine" ]]; then
         ncurses-dev readline-dev libedit-dev \
         libffi-dev python3-dev \
         bison flex \
-        pkgconf \
-        llvm-test-utils
-    log "Verifying development headers..."
-    ls -ld /usr/include/libxml2 2>/dev/null || log "WARNING: /usr/include/libxml2 not found"
-    ls -ld /usr/include/curl 2>/dev/null || log "WARNING: /usr/include/curl not found"
-    ls /usr/lib/libxml2* 2>/dev/null || log "WARNING: libxml2 library not found"
-    ls /usr/lib/libcurl* 2>/dev/null || log "WARNING: libcurl library not found"
-    log "Verifying critical LLVM static libraries..."
-    for lib in LLVMDemangle LLVMTestingAnnotations LLVMCore LLVMSupport; do
-        if ls /usr/lib/llvm*/lib/lib${lib}.a 2>/dev/null; then
-            log "✅ lib${lib}.a found"
-        else
-            log "WARNING: lib${lib}.a missing"
-        fi
-    done
+        pkgconf
+
 elif [[ "$DISTRO" == "debian" ]]; then
     log "Debian detected - installing packages with apt..."
     apt-get update
     apt-get install -y \
-        git clang llvm llvm-dev libclang-dev \
+        git curl wget ca-certificates \
+        build-essential clang llvm llvm-dev libclang-dev \
         cmake ninja-build \
         autoconf automake libtool bison flex gawk texinfo \
-        patchelf quilt rsync tar wget curl build-essential \
+        patchelf quilt rsync tar \
         libxml2-dev libcurl4-openssl-dev \
         libssl-dev zlib1g-dev \
         libncurses5-dev libreadline-dev libedit-dev \
         libffi-dev python3-dev \
         pkg-config
+
 elif [[ "$DISTRO" == "gentoo" ]]; then
+    log "Gentoo detected - running emerge..."
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
     emerge -av --noreplace \
         git clang llvm cmake ninja \
         autoconf automake libtool bison flex gawk texinfo \
         patchelf quilt rsync tar wget curl \
         sys-devel/gcc sys-libs/glibc
+
+else
+    log "WARNING: Unknown distro. Trying to install common tools..."
+    command -v apt-get && apt-get install -y git curl wget build-essential || true
+    command -v apk && apk add --no-cache git curl wget build-base || true
 fi
 
-log "Build dependencies installed."
+log "Build dependencies installed (including git)."
 
 # ====================== Snapshot ======================
 if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
