@@ -6,25 +6,19 @@
 # ====================== Fil-C Settings ======================
 export FILC_REPO="https://github.com/pizlonator/fil-c.git"
 export FILC_BRANCH="deluge"
-
-# === Pinning Strategy ===
-# For maximum reproducibility (recommended for testing):
-#   Use a specific commit hash.
-#
-# For system-wide / daily use:
-#   Use "latest" or a recent stable tag if available.
 export FILC_COMMIT=""                                          # Leave empty for latest on branch
 export FILC_COMMIT="39ee664dbf0b7db841ae05269201e757447290ee"  # Recent commit in deluge branch
 export FILC_TAG="v0.678"
 #export FILC_COMMIT="39ee664dbf0b7db841ae05269201e757447290ee" # deluge snapshot, Mar 27, 2026, LLVM 20.1.8
 export FILC_USE_TAG=true                                       # Set to true if using FILC_TAG
 
-# Alternative: Use latest tag (less reproducible but more "stable")
-# export FILC_USE_LATEST_TAG=true
-
-export FILC_LIBC="glibc"                       # glibc (recommended) or musl
+export FILC_LIBC="glibc"
 export FILC_PREFIX="/opt/fil"
 export YOLO_PREFIX="/yolo"
+
+# ====================== Git Optimization ======================
+export GIT_SHALLOW=false
+export GIT_CACHE_DIR="$HOME/.cache/filc-git-cache"
 
 # ====================== Build Settings ======================
 export MAKEOPTS="-j$(nproc)"
@@ -51,37 +45,18 @@ export SKIP_GENTOO_BRIDGE=false
 # Force flags
 export FORCE_FRESH=${FORCE_FRESH:-false}
 
-# ====================== Git Optimization ======================
-# Disable shallow clone when using a pinned commit or tag
-if [[ -n "$FILC_COMMIT" || "$FILC_USE_TAG" == "true" ]]; then
-    export GIT_SHALLOW=false
-else
-    export GIT_SHALLOW=true
-fi
-
-# ====================== Git Cache for Reproducibility ======================
-export GIT_SHALLOW=true # May break
-export GIT_CACHE_DIR="${GIT_CACHE_DIR:-$HOME/.cache/filc-git-cache}"
-mkdir -p "$GIT_CACHE_DIR"
-
-# Use reference cache to avoid re-downloading
-export GIT_CLONE_FLAGS="--progress"
-if [[ "$GIT_SHALLOW" == "true" ]]; then
-    export GIT_CLONE_FLAGS="$GIT_CLONE_FLAGS --depth 1"
-fi
-
-# ====================== Logging Function (Early) ======================
+# ====================== Logging Function ======================
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_DIR/bootstrap.log" 2>/dev/null || echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
-# ====================== Logging ======================
+# ====================== Configuration Summary ======================
 log_config() {
     echo "=== filc-bootstrap Configuration ==="
     echo "Fil-C branch     : ${FILC_BRANCH}"
     if [[ -n "${FILC_COMMIT}" ]]; then
         echo "Fil-C commit     : ${FILC_COMMIT} (pinned)"
-    elif [[ -n "${FILC_TAG}" && "${FILC_USE_TAG}" == "true" ]]; then
+    elif [[ "$FILC_USE_TAG" == "true" && -n "${FILC_TAG}" ]]; then
         echo "Fil-C tag        : ${FILC_TAG}"
     else
         echo "Fil-C commit     : tip of ${FILC_BRANCH}"
@@ -100,13 +75,19 @@ log_config() {
 }
 
 # ====================== Load Hooks ======================
-# Centralized hook file (like requirements.txt)
-if [[ -f "$SCRIPT_DIR/hooks.sh" ]]; then
-    source "$SCRIPT_DIR/hooks.sh"
-    log "hooks.sh loaded successfully from host path."
-else
-    log "ERROR: hooks.sh not found. Distro-specific support may be missing."
-    exit 1
-fi
+# hooks_requirements.sh  → dependency installation hooks
+# hooks_chroot_setup.sh  → chroot setup hooks for Phase 00
 
-###
+for hook_file in "hooks_requirements.sh" "hooks_chroot_setup.sh"; do
+    if [[ -f "$SCRIPT_DIR/$hook_file" ]]; then
+        source "$SCRIPT_DIR/$hook_file"
+        log "$hook_file loaded successfully."
+    elif [[ -f "$HOST_SCRIPT_DIR/$hook_file" ]]; then
+        source "$HOST_SCRIPT_DIR/$hook_file"
+        log "$hook_file loaded from host path."
+    else
+        log "WARNING: $hook_file not found. Some functionality may be missing."
+    fi
+done
+
+log_config
