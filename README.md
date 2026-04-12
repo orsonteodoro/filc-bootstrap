@@ -58,7 +58,7 @@ These define what the VM guest settings.
   - **Recommended**: 8–16 GiB (much more comfortable)
   - **Ideal**: 16+ GiB for full Gentoo rebuilds
 
-- **Disk space**: Minimum 40 GB (60+ GB recommended)
+- **Disk space**: Minimum 80 GB (For swap, snapshots, and storage)
 - **CPU cores**: 4+ cores (6–8 ideal)
 
 **Note:**

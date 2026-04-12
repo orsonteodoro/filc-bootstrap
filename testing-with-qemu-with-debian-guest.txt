@@ -10,7 +10,7 @@ cd ~/qemu-debian
 wget https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso
 
 # Create virtual disk
-qemu-img create -f qcow2 debian.qcow2 40G
+qemu-img create -f qcow2 debian.qcow2 80G
 
 #
 # The GUEST_VM_RAM should be RAM_HOST/2 or RAM_HOST/4 to prevent swapping.

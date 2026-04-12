@@ -10,7 +10,7 @@ cd ~/qemu-alpine
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso
 
 cd ~/qemu-alpine
-qemu-img create -f qcow2 alpine.qcow2 40G
+qemu-img create -f qcow2 alpine.qcow2 80G
 
 #
 # The GUEST_VM_RAM should be RAM_HOST/2 or RAM_HOST/4 to prevent swapping.
