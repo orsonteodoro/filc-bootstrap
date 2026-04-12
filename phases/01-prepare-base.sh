@@ -103,8 +103,15 @@ if [[ "$DISTRO" == "alpine" ]]; then
         patchelf rsync tar \
         libxml2-dev curl-dev \
         openssl-dev zlib-dev \
-        ncurses-dev readline-dev \
-        libedit-dev
+        ncurses-dev readline-dev libedit-dev \
+        libffi-dev python3-dev \
+        bison flex \
+        pkgconf
+    log "Verifying development headers..."
+    ls -ld /usr/include/libxml2 2>/dev/null || log "WARNING: /usr/include/libxml2 not found"
+    ls -ld /usr/include/curl 2>/dev/null || log "WARNING: /usr/include/curl not found"
+    ls /usr/lib/libxml2* 2>/dev/null || log "WARNING: libxml2 library not found"
+    ls /usr/lib/libcurl* 2>/dev/null || log "WARNING: libcurl library not found"
 elif [[ "$DISTRO" == "gentoo" ]]; then
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
     emerge -av --noreplace git clang llvm cmake ninja patchelf quilt rsync tar wget curl
