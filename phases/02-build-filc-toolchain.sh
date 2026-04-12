@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Fixed library detection for Alpine)
+# Phase 02 - Build Fil-C Toolchain (Force integrated assembler)
 # =============================================================================
 
 set -euo pipefail
@@ -15,40 +15,28 @@ log() {
 log "Starting Phase 02: Building Fil-C Toolchain"
 
 cd "$FILC_SOURCE_DIR" || {
-    log "ERROR: Cannot cd to Fil-C source directory: $FILC_SOURCE_DIR"
+    log "ERROR: Cannot cd to Fil-C source directory"
     exit 1
 }
 
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 log "Target libc: $FILC_LIBC"
-log "Install prefix: $FILC_PREFIX"
 
-# ====================== Fix library detection for Alpine ======================
-if [[ -f /etc/alpine-release ]]; then
-    log "Alpine detected - setting CMake library paths..."
+# ====================== Fix for Alpine/Debian ======================
+if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
+    log "Forcing Clang integrated assembler to avoid .lbe pseudo-op error..."
 
-    export CMAKE_PREFIX_PATH="/usr"
-    export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig"
-    
-    # Explicitly tell CMake where to find libxml2 and curl
-    export LIBXML2_LIBRARY="/usr/lib/libxml2.so"
-    export LIBXML2_INCLUDE_DIR="/usr/include/libxml2"
-    export CURL_LIBRARY="/usr/lib/libcurl.so"
-    export CURL_INCLUDE_DIR="/usr/include/curl"
-
-    # Disable LLVM testing components that are missing on Alpine
-    export CMAKE_ARGS="-DLLVM_INCLUDE_TESTS=OFF -DLLVM_BUILD_TESTS=OFF -DLLVM_ENABLE_ASSERTIONS=OFF"
-
+    export CC="clang -integrated-as"
+    export CXX="clang++ -integrated-as"
+    export CMAKE_ARGS="-DLLVM_USE_LINKER=lld -DCMAKE_ASM_COMPILER=clang -DCMAKE_ASM_FLAGS=-integrated-as"
 fi
 
 # ====================== Choose build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
-    log "Using musl variant"
 else
     BUILD_SCRIPT="build_all_fast_glibc.sh"
-    log "Using glibc variant (recommended)"
 fi
 
 if [[ ! -f "./$BUILD_SCRIPT" ]]; then
@@ -70,31 +58,28 @@ else
     exit 1
 fi
 
-# ====================== Setup Fil-C installation ======================
-log "Setting up Fil-C installation in $FILC_PREFIX"
+# ====================== Setup installation ======================
+log "Setting up Fil-C installation..."
 
 if [[ -d "/opt/fil" ]]; then
-    log "Fil-C appears to be installed in /opt/fil"
+    log "Fil-C installed in /opt/fil"
     mkdir -p /usr/local/bin
     ln -sf /opt/fil/bin/filcc /usr/local/bin/filcc 2>/dev/null || true
     ln -sf /opt/fil/bin/fil++ /usr/local/bin/fil++ 2>/dev/null || true
-else
-    log "WARNING: /opt/fil directory not found. Build script may use a different prefix."
 fi
 
-# Verify compiler
-log "Verifying filcc installation..."
+# Verify
 if command -v filcc >/dev/null; then
     filcc --version | head -n 5
-    log "filcc version check passed."
+    log "filcc verification passed."
 else
-    log "WARNING: filcc command not found in PATH."
+    log "WARNING: filcc not found in PATH"
 fi
 
 log "Phase 02 completed successfully!"
 log "Fil-C compiler and runtime have been built."
 
 echo ""
-echo "Next step: Phase 03 (setup-dual-libc.sh) — the critical LC transition."
+echo "Next step: Phase 03 (setup-dual-libc.sh)"
 
 exit 0
