@@ -98,7 +98,7 @@ log "Installing build dependencies..."
 if [[ "$DISTRO" == "alpine" ]]; then
     apk add --no-cache \
         bash git curl wget ca-certificates \
-        build-base clang clang-dev llvm llvm-dev \
+        build-base clang clang-dev llvm llvm-dev llvm-static llvm-libs \
         cmake ninja \
         patchelf rsync tar \
         libxml2-dev curl-dev \
@@ -106,8 +106,7 @@ if [[ "$DISTRO" == "alpine" ]]; then
         ncurses-dev readline-dev libedit-dev \
         libffi-dev python3-dev \
         bison flex \
-        pkgconf \
-        llvm-static llvm-libs   # ← Add these for static libraries
+        pkgconf
     log "Verifying development headers..."
     ls -ld /usr/include/libxml2 2>/dev/null || log "WARNING: /usr/include/libxml2 not found"
     ls -ld /usr/include/curl 2>/dev/null || log "WARNING: /usr/include/curl not found"
@@ -115,7 +114,8 @@ if [[ "$DISTRO" == "alpine" ]]; then
     ls /usr/lib/libcurl* 2>/dev/null || log "WARNING: libcurl library not found"
     log "Verifying LLVM static libraries..."
     ls /usr/lib/llvm*/lib/libLLVMDemangle.a 2>/dev/null && log "✅ libLLVMDemangle.a found" || log "WARNING: libLLVMDemangle.a missing"
-    ls /usr/lib/llvm*/lib/libLLVM*.a 2>/dev/null | head -5 || log "WARNING: LLVM static libs missing"
+    ls /usr/lib/llvm*/lib/libLLVMTestingAnnotations.a 2>/dev/null && log "✅ libLLVMTestingAnnotations.a found" || log "WARNING: libLLVMTestingAnnotations.a missing"
+    ls /usr/lib/llvm*/lib/libLLVM*.a 2>/dev/null | head -10 || log "WARNING: LLVM static libs missing"
 elif [[ "$DISTRO" == "gentoo" ]]; then
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
     emerge -av --noreplace git clang llvm cmake ninja patchelf quilt rsync tar wget curl
