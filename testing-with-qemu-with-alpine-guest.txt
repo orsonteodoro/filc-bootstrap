@@ -67,7 +67,7 @@ sync
 # The total memory needs to be 16 GiB for possibly worst case scenario for linking at maybe 13 GiB total memory.
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 16384 \
+  -m 4096 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
