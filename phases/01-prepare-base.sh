@@ -29,6 +29,9 @@ if [[ -f /etc/gentoo-release ]]; then
 elif [[ -f /etc/alpine-release ]]; then
     DISTRO="alpine"
     log "Detected Alpine"
+elif [[ -f /etc/debian_version ]]; then
+    DISTRO="debian"
+    log "Detected Debian"
 else
     DISTRO="unknown"
     log "WARNING: Unknown distribution"
@@ -121,9 +124,26 @@ if [[ "$DISTRO" == "alpine" ]]; then
             log "WARNING: lib${lib}.a missing"
         fi
     done
+elif [[ "$DISTRO" == "debian" ]]; then
+    log "Debian detected - installing packages with apt..."
+    apt-get update
+    apt-get install -y \
+        git clang llvm llvm-dev libclang-dev \
+        cmake ninja-build \
+        autoconf automake libtool bison flex gawk texinfo \
+        patchelf quilt rsync tar wget curl build-essential \
+        libxml2-dev libcurl4-openssl-dev \
+        libssl-dev zlib1g-dev \
+        libncurses5-dev libreadline-dev libedit-dev \
+        libffi-dev python3-dev \
+        pkg-config
 elif [[ "$DISTRO" == "gentoo" ]]; then
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
-    emerge -av --noreplace git clang llvm cmake ninja patchelf quilt rsync tar wget curl
+    emerge -av --noreplace \
+        git clang llvm cmake ninja \
+        autoconf automake libtool bison flex gawk texinfo \
+        patchelf quilt rsync tar wget curl \
+        sys-devel/gcc sys-libs/glibc
 fi
 
 log "Build dependencies installed."

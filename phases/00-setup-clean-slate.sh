@@ -1,15 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Corrected cp -aT source path)
+# Phase 00 - Setup Clean Slate (Updated with good Debian support)
 # =============================================================================
 
 set -euo pipefail
 
-# Calculate host paths VERY EARLY
-HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-# HOST_SCRIPT_DIR now points to the filc-bootstrap directory itselfC
-
-source "$HOST_SCRIPT_DIR/config.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+source "$SCRIPT_DIR/config.sh"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [Phase 00] $*"
@@ -19,12 +16,11 @@ log "Starting Phase 00: Clean Slate Setup"
 
 TARGET_ROOT="${TARGET_ROOT:-/mnt/filc-chroot}"
 TEST_MODE=${TEST_MODE:-false}
-TEST_DISTRO=${TEST_DISTRO:-"alpine"}
+TEST_DISTRO=${TEST_DISTRO:-"debian"}   # Default to debian for testing
 
 ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
-log "Host bootstrap path: $HOST_SCRIPT_DIR"
 
 # ====================== Gentle Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
@@ -76,8 +72,22 @@ EOF
     apk --root "$TARGET_ROOT" --no-cache add \
         bash git curl wget build-base clang cmake ninja patchelf rsync tar
 
+# ====================== Debian (Improved) ======================
+elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
+    log "Creating clean Debian minbase chroot using debootstrap..."
+
+    if ! command -v debootstrap >/dev/null; then
+        apt-get update && apt-get install -y debootstrap
+    fi
+
+    log "Running debootstrap..."
+    debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
+
+    log "Debian chroot created successfully."
+
+# ====================== Gentoo ======================
 else
-    log "Setting up clean Gentoo stage 3..."
+    log "Creating clean Gentoo stage 3..."
     STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
     LATEST_FILE="latest-stage3-amd64.txt"
     STAGE3_PROFILE="stage3-amd64"
@@ -102,34 +112,37 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Reliable Copy using cp -aT ======================
+# ====================== Common Setup ======================
+log "Setting up chroot mounts and DNS..."
+mount --types proc /proc "$TARGET_ROOT/proc" 2>/dev/null || true
+mount --rbind /sys "$TARGET_ROOT/sys" 2>/dev/null || true
+mount --make-rslave "$TARGET_ROOT/sys" 2>/dev/null || true
+mount --rbind /dev "$TARGET_ROOT/dev" 2>/dev/null || true
+mount --make-rslave "$TARGET_ROOT/dev" 2>/dev/null || true
+mount --bind /run "$TARGET_ROOT/run" 2>/dev/null || true
+
+cp --dereference /etc/resolv.conf "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
+chmod 644 "$TARGET_ROOT/etc/resolv.conf" 2>/dev/null || true
+
 log "Copying filc-bootstrap scripts into chroot using cp -aT..."
 
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
-
-log "Copying from:  $HOST_SCRIPT_DIR"
-log "Copying to:  $TARGET_ROOT/root/filc-bootstrap"
-
-# Use cp -aT to avoid nesting
 cp -aT "$HOST_SCRIPT_DIR" "$TARGET_ROOT/root/filc-bootstrap" || {
     log "WARNING: cp -aT failed, trying fallback..."
     cp -a "$HOST_SCRIPT_DIR"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 }
 
-# Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
-    log "✅ bootstrap.sh copied successfully into chroot"
+    log "✅ bootstrap.sh copied successfully"
 else
-    log "ERROR: bootstrap.sh still not found after copy attempts"
+    log "ERROR: bootstrap.sh not found after copy"
     ls -la "$TARGET_ROOT/root/filc-bootstrap/"
     exit 1
 fi
 
-# Create dummy file inside chroot
 echo "Dummy test file created at $(date)" > "$TARGET_ROOT/root/filc-bootstrap/DUMMY_TEST_FILE.txt"
 log "Dummy file created inside chroot"
 
-# ====================== Chroot ======================
 log "Chrooting into clean environment..."
 
 exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
@@ -147,10 +160,6 @@ exec chroot "$TARGET_ROOT" /bin/bash <<'CHROOT_EOF'
         echo "ERROR: bootstrap.sh NOT FOUND!"
         ls -la /root/filc-bootstrap/
         exit 1
-    fi
-
-    if [[ -f DUMMY_TEST_FILE.txt ]]; then
-        echo "✅ Dummy file visible"
     fi
 
     echo "Starting main bootstrap..."

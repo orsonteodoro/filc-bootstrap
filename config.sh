@@ -43,7 +43,7 @@ export SNAPSHOT_PREFIX="filc-snapshot"
 
 # ====================== Test Mode ======================
 export TEST_MODE=${TEST_MODE:-false}
-export TEST_DISTRO=${TEST_DISTRO:-"alpine"}
+export TEST_DISTRO=${TEST_DISTRO:-"debian"}
 
 # Gentoo-specific
 export SKIP_GENTOO_BRIDGE=false
