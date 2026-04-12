@@ -1,4 +1,5 @@
-# Instructions for creating a VM for testing bootstraping before the expensive gentoo bootstrapping.
+# Instructions for creating a Alpine guest VM for testing bootstraping before the expensive Gentoo bootstrapping.
+# This is for testing both the bootstrap scripts correctness quickly and musl build.
 
 # Outside in the host do
 

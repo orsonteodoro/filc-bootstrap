@@ -1,7 +1,7 @@
-# Instructions for creating a Debian VM for testing bootstrap
-# (Recommended before doing the full expensive Gentoo bootstrapping)
+# Instructions for creating a Debian guest VM for testing bootstraping before the expensive Gentoo bootstrapping.
+# This is for testing both the bootstrap scripts for correctness quickly and glibc build.
 
-# 1. On the Gentoo host (outside the VM)
+# On the Gentoo host do
 
 mkdir -p ~/qemu-debian
 cd ~/qemu-debian
@@ -29,7 +29,7 @@ qemu-system-x86_64 \
 chmod +x setup.sh
 ./setup.sh
 
-# After install
+# After installing Debian in the VM, add a new launcher script below
 
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 qemu-system-x86_64 \
@@ -45,6 +45,7 @@ qemu-system-x86_64 \
   -name "Debian12-FilC-Test" \
   "$@"
 chmod +x setup2.sh
+./setup2.sh
 
 # In the Debian guest:
 
