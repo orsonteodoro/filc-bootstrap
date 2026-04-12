@@ -8,6 +8,7 @@ set -euo pipefail
 # Calculate host paths VERY EARLY
 HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
 HOST_BOOTSTRAP_PATH="$HOST_SCRIPT_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
 
 source "$HOST_SCRIPT_DIR/config.sh"
 
