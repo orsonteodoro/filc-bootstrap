@@ -43,6 +43,8 @@ chmod +x setup.sh
 ./setup.sh
 
 # Install debian
+# For most options, use the defaults except swap space.
+# Delete the swap parition.  We will use a swap file instead.
 # Install is done
 
 # 1. Create an 12 GiB swap file
