@@ -1,0 +1,33 @@
+# Instructions for creating a Debian VM for testing bootstrap
+# (Recommended before doing the full expensive Gentoo bootstrapping)
+
+# 1. On the Gentoo host (outside the VM)
+
+mkdir -p ~/qemu-debian
+cd ~/qemu-debian
+
+# Download a recent Debian netinst ISO (small and reliable)
+wget https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso
+
+# Create virtual disk
+qemu-img create -f qcow2 debian.qcow2 40G
+
+# Contents of ~/qemu-debian/setup.sh (to boot the installer)
+cat > setup.sh << 'EOF'
+#!/bin/bash
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m 8192 \
+  -cpu host \
+  -smp 6 \
+  -nic user,model=virtio \
+  -drive file=debian.qcow2,format=qcow2,if=virtio \
+  -cdrom debian-12.10.0-amd64-netinst.iso \
+  -boot once=d \
+  -display gtk \
+  -vga virtio \
+  -usb -device usb-tablet
+EOF
+
+chmod +x setup.sh
+./setup.sh
