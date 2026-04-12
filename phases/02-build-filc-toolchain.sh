@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Aggressive integrated assembler fix)
+# Phase 02 - Build Fil-C Toolchain (Aggressive fix for .lbe / .byt / CFI errors)
 # =============================================================================
 
 set -euo pipefail
@@ -23,12 +23,12 @@ log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 log "Target libc: $FILC_LIBC"
 
-# ====================== Strong Fix for CFI and register errors ======================
+# ====================== Aggressive Fix for Custom Pseudo-Ops (.lbe, .byt, CFI) ======================
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
-    log "Applying strong fixes for integrated assembler and lld..."
+    log "Applying aggressive integrated assembler fix..."
 
-    export CC="clang -integrated-as -fno-asynchronous-unwind-tables"
-    export CXX="clang++ -integrated-as -fno-asynchronous-unwind-tables"
+    export CC="clang -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
+    export CXX="clang++ -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
     export ASM="clang -integrated-as"
 
     export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
@@ -37,7 +37,10 @@ if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
                        -DLLVM_INCLUDE_TESTS=OFF \
                        -DLLVM_BUILD_TESTS=OFF \
                        -DLLVM_ENABLE_ASSERTIONS=OFF \
-                       -DLLVM_ENABLE_Z3_SOLVER=OFF"
+                       -DLLVM_ENABLE_Z3_SOLVER=OFF \
+                       -DLLVM_ENABLE_OCAMLDOC=OFF \
+                       -DLLVM_ENABLE_BINDINGS=OFF \
+                       -DLLVM_TARGETS_TO_BUILD=X86"
 fi
 
 # ====================== Choose build script ======================
@@ -59,11 +62,10 @@ log "This step can take 30 minutes to several hours depending on hardware."
 
 chmod +x "./$BUILD_SCRIPT"
 
-# Run the build with environment variables
 if ./"$BUILD_SCRIPT"; then
-    log "Fil-C build completed successfully."
+    log "✅ Fil-C build completed successfully."
 else
-    log "ERROR: Fil-C build failed. Check the log above for details."
+    log "❌ Fil-C build failed. Check the log above for details."
     exit 1
 fi
 
