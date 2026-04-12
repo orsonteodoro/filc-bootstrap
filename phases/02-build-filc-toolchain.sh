@@ -23,12 +23,20 @@ log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 log "Target libc: $FILC_LIBC"
 
-# ====================== Aggressive Fix for Custom Pseudo-Ops (.lbe, .byt, CFI) ======================
+# ====================== Aggressive Fix for CFI / pseudo-op errors + ccache ======================
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
-    log "Applying aggressive integrated assembler fix..."
+    log "Applying aggressive integrated assembler fix + ccache..."
 
-    export CC="clang -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
-    export CXX="clang++ -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
+    # Use ccache if available
+    if command -v ccache >/dev/null; then
+        CC_LAUNCHER="ccache "
+        log "Using ccache for compilation"
+    else
+        CC_LAUNCHER=""
+    fi
+
+    export CC="${CC_LAUNCHER}clang -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
+    export CXX="${CC_LAUNCHER}clang++ -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
     export ASM="clang -integrated-as"
 
     export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
@@ -40,7 +48,14 @@ if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
                        -DLLVM_ENABLE_Z3_SOLVER=OFF \
                        -DLLVM_ENABLE_OCAMLDOC=OFF \
                        -DLLVM_ENABLE_BINDINGS=OFF \
-                       -DLLVM_TARGETS_TO_BUILD=X86"
+                       -DLLVM_TARGETS_TO_BUILD=X86 \
+                       -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                       -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+fi
+
+if command -v ccache >/dev/null; then
+    log "ccache statistics:"
+    ccache -s | head -n 10
 fi
 
 # ====================== Choose build script ======================

@@ -21,14 +21,16 @@ alpine_prepare_deps() {
         pkgconf
 }
 
-# ====================== Debian Hooks ======================
+# ====================== Debian prepare_deps Hook ======================
 debian_prepare_deps() {
-    log "Debian: Installing dependencies..."
+    log "Debian: Installing dependencies + ccache for faster rebuilds..."
+
     apt-get update --allow-releaseinfo-change || true
     apt-get install -y --no-install-recommends \
         git curl wget ca-certificates \
         build-essential clang llvm llvm-dev libclang-dev lld \
         cmake ninja-build \
+        ccache \                          # Added: speeds up rebuilds after failures
         autoconf automake libtool bison flex gawk texinfo \
         patchelf quilt rsync tar \
         libxml2-dev libcurl4-openssl-dev \
@@ -36,6 +38,12 @@ debian_prepare_deps() {
         libncurses5-dev libreadline-dev libedit-dev \
         libffi-dev python3-dev \
         pkg-config
+
+    # Configure ccache (8 GiB cache size is good balance)
+    log "Configuring ccache..."
+    ccache --max-size=8G
+    ccache -z   # reset statistics for clean run
+    log "✅ ccache enabled with 8 GiB max size"
 }
 
 # ====================== Gentoo Hooks ======================
