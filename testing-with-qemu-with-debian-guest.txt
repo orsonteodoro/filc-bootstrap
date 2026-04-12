@@ -6,19 +6,19 @@
 mkdir -p ~/qemu-debian
 cd ~/qemu-debian
 
-# Download the latest Debian 12 netinst ISO (current as of 2026)
+# Download the Debian 12 netinst ISO (current as of 2026)
 wget https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso
 
 # Create virtual disk
 qemu-img create -f qcow2 debian.qcow2 40G
 
-# For RAM with the -m arg in qemu, the recommended value is RAM/2 or RAM/4 to avoid thrashing.
-# The below assumes the host's RAM is 8192 so -m is 4096 for guest VM.
+# The below assumes the host's RAM is 8192 and guest has 8 GiB RAM and 8 GiB
+# swap for guest to prevent OOM killer from breaking build and linking.
 
 # Contents of ~/qemu-debian/setup.sh (to boot the installer)
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m 8192 \
   -cpu host \
   -smp 6 \
   -nic user,model=virtio \
@@ -44,13 +44,13 @@ swapon /swapfile
 # 2. Make it permanent across reboots
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-# Verify 16 GiB total memory
-free
-
 sync
 # Shutdown vm
 
 # Outside in the host do
+
+# Verify 16 GiB total memory
+free
 
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 # The total memory needs to be 16 GiB for possibly worst case scenario for linking at maybe 13 GiB total memory.

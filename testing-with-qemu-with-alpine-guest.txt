@@ -5,13 +5,15 @@
 
 mkdir -p ~/qemu-alpine
 cd ~/qemu-alpine
+
+# Get the latest stable Alpine
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso
 
 cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 40G
 
-# For RAM with the -m arg in qemu, the recommended value is RAM/2 or RAM/4 to avoid thrashing.
-# The below assumes the host's RAM is 8192 so -m is 4096 for guest VM.
+# The below assumes the host's RAM is 8192 and guest has 8 GiB RAM and 8 GiB
+# swap for guest to prevent OOM killer from breaking build and linking.
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 qemu-system-x86_64 \
@@ -48,9 +50,6 @@ swapon /swapfile
 # 2. Make it permanent across reboots
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-# Verify 16 GiB total memory
-free
-
 sync
 # Shutdown vm
 
@@ -71,6 +70,9 @@ chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
 # Inside the Alpine guest do
+
+# Verify 16 GiB total memory
+free
 
 # Update available packages list and tools required to get filc-bootstrap
 cd ~/
