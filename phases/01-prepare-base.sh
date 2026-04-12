@@ -106,12 +106,16 @@ if [[ "$DISTRO" == "alpine" ]]; then
         ncurses-dev readline-dev libedit-dev \
         libffi-dev python3-dev \
         bison flex \
-        pkgconf
+        pkgconf \
+        llvm-static llvm-libs   # ← Add these for static libraries
     log "Verifying development headers..."
     ls -ld /usr/include/libxml2 2>/dev/null || log "WARNING: /usr/include/libxml2 not found"
     ls -ld /usr/include/curl 2>/dev/null || log "WARNING: /usr/include/curl not found"
     ls /usr/lib/libxml2* 2>/dev/null || log "WARNING: libxml2 library not found"
     ls /usr/lib/libcurl* 2>/dev/null || log "WARNING: libcurl library not found"
+    log "Verifying LLVM static libraries..."
+    ls /usr/lib/llvm*/lib/libLLVMDemangle.a 2>/dev/null && log "✅ libLLVMDemangle.a found" || log "WARNING: libLLVMDemangle.a missing"
+    ls /usr/lib/llvm*/lib/libLLVM*.a 2>/dev/null | head -5 || log "WARNING: LLVM static libs missing"
 elif [[ "$DISTRO" == "gentoo" ]]; then
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
     emerge -av --noreplace git clang llvm cmake ninja patchelf quilt rsync tar wget curl
