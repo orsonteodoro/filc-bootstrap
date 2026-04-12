@@ -121,16 +121,49 @@ else
     tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
 fi
 
-# ====================== Reliable Copy using cp -aT ======================
-log "Copying filc-bootstrap scripts into chroot using cp -aT..."
+# ====================== Reliable Script Copy + Consistency Check ======================
+log "Copying filc-bootstrap scripts into chroot..."
 
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-# Use absolute host path and cp -aT
+# IMPORTANT: Only remove script files, protect source cache and checkpoints
+log "Removing old script files (protecting sources, cache, and checkpoints)..."
+
+# Safe removal: only delete *.sh files and known config files, leave sources/ and other dirs
+find "$TARGET_ROOT/root/filc-bootstrap" -maxdepth 1 -type f \( -name "*.sh" -o -name "config.sh" -o -name "hooks.sh" \) -delete 2>/dev/null || true
+
+# Now copy fresh scripts
+log "Copying fresh scripts from host..."
 cp -aT "$HOST_SCRIPT_DIR" "$TARGET_ROOT/root/filc-bootstrap" || {
     log "WARNING: cp -aT failed, trying fallback..."
     cp -a "$HOST_SCRIPT_DIR"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 }
+
+# ====================== Consistency Check ======================
+log "Verifying script consistency between host and chroot..."
+
+HOST_HASH=$(find "$HOST_SCRIPT_DIR" -maxdepth 1 -type f \( -name "*.sh" -o -name "config.sh" -o -name "hooks.sh" \) -exec sha256sum {} + 2>/dev/null | sort | sha256sum | awk '{print $1}')
+CHROOT_HASH=$(find "$TARGET_ROOT/root/filc-bootstrap" -maxdepth 1 -type f \( -name "*.sh" -o -name "config.sh" -o -name "hooks.sh" \) 2>/dev/null | xargs sha256sum 2>/dev/null | sort | sha256sum | awk '{print $1}' || echo "failed")
+
+if [[ "$HOST_HASH" == "$CHROOT_HASH" && "$CHROOT_HASH" != "failed" ]]; then
+    log "✅ Script consistency check passed (host and chroot scripts match)"
+else
+    log "⚠️  WARNING: Script inconsistency detected between host and chroot"
+    log "    Host hash   : ${HOST_HASH:0:16}..."
+    log "    Chroot hash : ${CHROOT_HASH:0:16}..."
+    log "    Consider running with --fresh if scripts are outdated."
+fi
+
+# Final safety check for critical files
+if [[ ! -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" || \
+      ! -f "$TARGET_ROOT/root/filc-bootstrap/config.sh" || \
+      ! -f "$TARGET_ROOT/root/filc-bootstrap/hooks.sh" ]]; then
+    log "ERROR: One or more core scripts are missing in chroot after copy"
+    ls -la "$TARGET_ROOT/root/filc-bootstrap/"
+    exit 1
+fi
+
+log "✅ All core scripts copied successfully"
 
 # Verify
 if [[ -f "$TARGET_ROOT/root/filc-bootstrap/bootstrap.sh" ]]; then
