@@ -46,6 +46,7 @@ It combines **invisible capabilities** (InvisiCaps) with a high-performance conc
 - `libxml2-dev`
 - `libcurl4-openssl-dev` (or equivalent)
 - `pkg-config`
+- **ccache**: Highly recommended (speeds up rebuilds significantly after failures)
 
 ### VM Build Requirements
 
