@@ -62,8 +62,6 @@ else
     exit 1
 fi
 
-log "Dependencies installation completed via hook."
-
 # Verify critical tools
 for tool in git clang cmake ninja; do
     if ! command -v "$tool" >/dev/null; then
@@ -114,15 +112,6 @@ if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
     tar -czf "$BACKUP_DIR/$SNAPSHOT_NAME" \
         --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run --exclude=/tmp \
         /bin /usr/bin /lib /usr/lib /etc 2>/dev/null || true
-fi
-
-# ====================== Load Hooks ======================
-# Like requirements.txt - all distro hooks are centralized here
-if [[ -f "$SCRIPT_DIR/hooks.sh" ]]; then
-    source "$SCRIPT_DIR/hooks.sh"
-else
-    log "WARNING: hooks.sh not found. Some distro support may be missing."
-    exit 1
 fi
 
 log "Phase 01 completed successfully!"

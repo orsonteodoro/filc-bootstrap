@@ -70,6 +70,14 @@ if [[ "$GIT_SHALLOW" == "true" ]]; then
     export GIT_CLONE_FLAGS="$GIT_CLONE_FLAGS --depth 1"
 fi
 
+# ====================== Load Hooks ======================
+# Centralized hook file (like requirements.txt)
+if [[ -f "$SCRIPT_DIR/hooks.sh" ]]; then
+    source "$SCRIPT_DIR/hooks.sh"
+else
+    log "WARNING: hooks.sh not found. Distro-specific support may be missing."
+fi
+
 # ====================== Logging ======================
 log_config() {
     echo "=== filc-bootstrap Configuration ==="
