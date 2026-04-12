@@ -15,7 +15,7 @@ qemu-img create -f qcow2 debian.qcow2 40G
 #
 # The GUEST_VM_RAM should be RAM_HOST/2 or RAM_HOST/4 to prevent swapping.
 # The GUEST_VM_SWAP should be 16384 - RAM_HOST/2
-# DO NOT USE GUEST_VM_RAM == RAM_HOST.
+# DO NOT USE GUEST_VM_RAM == RAM_HOST.  It will cause severe swapping.
 #
 # Use one of the following recommened combos:
 # 8 GiB host, 4 GiB RAM, 12 Swap, 16 GiB total VM Memory
