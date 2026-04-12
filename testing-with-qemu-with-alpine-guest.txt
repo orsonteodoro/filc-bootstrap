@@ -55,6 +55,7 @@ chmod +x ~/qemu-alpine/setup2.sh
 # Inside the Alpine guest do
 
 # Update available packages list and tools required to get filc-bootstrap
+cd ~/
 apk update
 apk add git bash
 

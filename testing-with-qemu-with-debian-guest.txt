@@ -48,6 +48,7 @@ chmod +x setup2.sh
 ./setup2.sh
 
 # In the Debian guest:
+cd ~/
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git
 
