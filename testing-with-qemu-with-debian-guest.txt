@@ -6,8 +6,8 @@
 mkdir -p ~/qemu-debian
 cd ~/qemu-debian
 
-# Download a recent Debian netinst ISO (small and reliable)
-wget https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso
+# Download the latest Debian 12 netinst ISO (current as of 2026)
+wget https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso
 
 # Create virtual disk
 qemu-img create -f qcow2 debian.qcow2 40G
