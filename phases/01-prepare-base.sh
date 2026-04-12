@@ -99,7 +99,12 @@ if [[ "$DISTRO" == "alpine" ]]; then
     apk add --no-cache \
         bash git curl wget ca-certificates \
         build-base clang clang-dev llvm llvm-dev \
-        cmake ninja patchelf rsync tar
+        cmake ninja \
+        patchelf rsync tar \
+        libxml2-dev curl-dev \
+        openssl-dev zlib-dev \
+        ncurses-dev readline-dev \
+        libedit-dev
 elif [[ "$DISTRO" == "gentoo" ]]; then
     emerge --sync --quiet || log "WARNING: emerge --sync failed"
     emerge -av --noreplace git clang llvm cmake ninja patchelf quilt rsync tar wget curl
