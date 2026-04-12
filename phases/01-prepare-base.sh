@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 01 - Prepare Base Environment (Improved git + cache handling)
+# Phase 01 - Prepare Base Environment (git installed FIRST)
 # =============================================================================
 
 set -euo pipefail
@@ -14,13 +14,12 @@ log() {
 
 log "Starting Phase 01: Prepare Base Environment"
 
-# Ensure we are in the correct location inside chroot
-if [[ ! -d /root/filc-bootstrap ]]; then
-    log "Copying bootstrap scripts into chroot..."
+# Ensure we are in the chroot and scripts are in place
+cd /root/filc-bootstrap || {
     mkdir -p /root/filc-bootstrap
     cp -a "$SCRIPT_DIR"/.. /root/filc-bootstrap/ 2>/dev/null || true
-fi
-cd /root/filc-bootstrap
+    cd /root/filc-bootstrap
+}
 
 # ====================== Distro Detection ======================
 if [[ -f /etc/gentoo-release ]]; then
@@ -37,10 +36,10 @@ else
     log "WARNING: Unknown distribution"
 fi
 
-# ====================== DNS Check ======================
+# ====================== DNS Verification ======================
 log "Verifying DNS resolution..."
 if ! ping -c 1 -W 5 -q google.com >/dev/null 2>&1; then
-    log "DNS failed. Applying fallback public DNS..."
+    log "DNS failed. Applying fallback..."
     cat > /etc/resolv.conf <<EOF
 nameserver 8.8.8.8
 nameserver 1.1.1.1
@@ -49,13 +48,71 @@ EOF
 fi
 log "DNS is working."
 
-# ====================== Git Cache Setup ======================
-mkdir -p "$GIT_CACHE_DIR"
+# ====================== Install git FIRST (Critical) ======================
+log "Installing git first (required for cloning Fil-C)..."
+
+if [[ "$DISTRO" == "alpine" ]]; then
+    apk update
+    apk add --no-cache git bash ca-certificates
+elif [[ "$DISTRO" == "debian" ]]; then
+    apt-get update --allow-releaseinfo-change || true
+    apt-get install -y --no-install-recommends git curl wget ca-certificates
+elif [[ "$DISTRO" == "gentoo" ]]; then
+    emerge --sync --quiet || log "WARNING: emerge --sync failed"
+    emerge -av --noreplace git
+else
+    log "WARNING: Unknown distro. Trying to install git..."
+    command -v apt-get && apt-get install -y git || true
+    command -v apk && apk add --no-cache git || true
+fi
+
+# Verify git is available
+if ! command -v git >/dev/null; then
+    log "ERROR: git is still not available after installation attempt"
+    exit 1
+fi
+log "✅ git is available."
+
+# ====================== Install Remaining Dependencies ======================
+log "Installing remaining build dependencies..."
+
+if [[ "$DISTRO" == "alpine" ]]; then
+    apk add --no-cache \
+        curl wget build-base clang clang-dev llvm llvm-dev llvm-static llvm-libs \
+        cmake ninja \
+        patchelf rsync tar \
+        libxml2-dev curl-dev \
+        openssl-dev zlib-dev \
+        ncurses-dev readline-dev libedit-dev \
+        libffi-dev python3-dev \
+        bison flex \
+        pkgconf
+
+elif [[ "$DISTRO" == "debian" ]]; then
+    apt-get install -y --no-install-recommends \
+        build-essential clang llvm llvm-dev libclang-dev \
+        cmake ninja-build \
+        autoconf automake libtool bison flex gawk texinfo \
+        patchelf quilt rsync tar \
+        libxml2-dev libcurl4-openssl-dev \
+        libssl-dev zlib1g-dev \
+        libncurses5-dev libreadline-dev libedit-dev \
+        libffi-dev python3-dev \
+        pkg-config
+
+elif [[ "$DISTRO" == "gentoo" ]]; then
+    emerge -av --noreplace \
+        clang llvm cmake ninja \
+        autoconf automake libtool bison flex gawk texinfo \
+        patchelf quilt rsync tar wget curl \
+        sys-devel/gcc sys-libs/glibc
+fi
+
+log "Build dependencies installed."
 
 # ====================== Clone / Update Fil-C ======================
 log "Setting up Fil-C source at $FILC_SOURCE_DIR"
 
-# Use absolute path inside chroot
 ABS_FILC_SOURCE_DIR="/root/filc-bootstrap/sources/fil-c"
 
 if [[ -d "$ABS_FILC_SOURCE_DIR/.git" ]]; then
@@ -75,12 +132,12 @@ git checkout "$FILC_BRANCH" || true
 if [[ -n "$FILC_COMMIT" ]]; then
     log "Pinning to commit: $FILC_COMMIT"
     git fetch origin "$FILC_COMMIT" || true
-    git checkout "$FILC_COMMIT" || log "WARNING: Commit not found, staying on branch"
+    git checkout "$FILC_COMMIT" || log "WARNING: Commit not found"
 fi
 
-# Final verification with absolute path
+# Final verification
 if [[ ! -f "$ABS_FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "WARNING: build_all_fast_glibc.sh not found. Resetting to branch tip..."
+    log "WARNING: build scripts not found. Resetting to branch tip..."
     git checkout "$FILC_BRANCH"
     git pull --ff-only --progress || true
 fi
@@ -94,72 +151,6 @@ fi
 
 log "Fil-C source ready."
 log "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
-
-# ====================== Install Dependencies (Aggressive) ======================
-log "Installing build dependencies..."
-
-if [[ "$DISTRO" == "alpine" ]]; then
-    log "Alpine detected - installing packages with apk..."
-    apk update
-    apk add --no-cache \
-        bash git curl wget ca-certificates \
-        build-base clang clang-dev llvm llvm-dev llvm-static llvm-libs \
-        cmake ninja \
-        patchelf rsync tar \
-        libxml2-dev curl-dev \
-        openssl-dev zlib-dev \
-        ncurses-dev readline-dev libedit-dev \
-        libffi-dev python3-dev \
-        bison flex \
-        pkgconf
-
-elif [[ "$DISTRO" == "debian" ]]; then
-    log "Debian detected - installing packages with apt..."
-    apt-get update --allow-releaseinfo-change || true
-    apt-get install -y --no-install-recommends \
-        git curl wget ca-certificates \
-        build-essential clang llvm llvm-dev libclang-dev \
-        cmake ninja-build \
-        autoconf automake libtool bison flex gawk texinfo \
-        patchelf quilt rsync tar \
-        libxml2-dev libcurl4-openssl-dev \
-        libssl-dev zlib1g-dev \
-        libncurses5-dev libreadline-dev libedit-dev \
-        libffi-dev python3-dev \
-        pkg-config
-
-elif [[ "$DISTRO" == "gentoo" ]]; then
-    log "Gentoo detected - running emerge..."
-    emerge --sync --quiet || log "WARNING: emerge --sync failed"
-    emerge -av --noreplace \
-        git clang llvm cmake ninja \
-        autoconf automake libtool bison flex gawk texinfo \
-        patchelf quilt rsync tar wget curl \
-        sys-devel/gcc sys-libs/glibc
-
-else
-    log "WARNING: Unknown distro. Trying common tools..."
-    command -v apt-get && apt-get update && apt-get install -y git curl wget build-essential || true
-    command -v apk && apk update && apk add --no-cache git curl wget build-base || true
-fi
-
-# Final git verification
-if ! command -v git >/dev/null; then
-    log "ERROR: git is still not available after package installation"
-    log "Trying emergency git installation..."
-    if [[ "$DISTRO" == "debian" ]]; then
-        apt-get install -y git
-    elif [[ "$DISTRO" == "alpine" ]]; then
-        apk add --no-cache git
-    fi
-fi
-
-if command -v git >/dev/null; then
-    log "✅ git is now available"
-else
-    log "ERROR: git could not be installed"
-    exit 1
-fi
 
 # ====================== Snapshot ======================
 if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
