@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Stronger integrated assembler + lld)
+# Phase 02 - Build Fil-C Toolchain (Aggressive integrated assembler fix)
 # =============================================================================
 
 set -euo pipefail
@@ -23,12 +23,12 @@ log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 log "Target libc: $FILC_LIBC"
 
-# ====================== Force Integrated Assembler + lld (Critical for CFI errors) ======================
+# ====================== Strong Fix for CFI and register errors ======================
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
-    log "Forcing Clang integrated assembler and lld to fix CFI / pseudo-op errors..."
+    log "Applying strong fixes for integrated assembler and lld..."
 
-    export CC="clang -integrated-as"
-    export CXX="clang++ -integrated-as"
+    export CC="clang -integrated-as -fno-asynchronous-unwind-tables"
+    export CXX="clang++ -integrated-as -fno-asynchronous-unwind-tables"
     export ASM="clang -integrated-as"
 
     export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
@@ -36,7 +36,8 @@ if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
                        -DCMAKE_ASM_FLAGS=-integrated-as \
                        -DLLVM_INCLUDE_TESTS=OFF \
                        -DLLVM_BUILD_TESTS=OFF \
-                       -DLLVM_ENABLE_ASSERTIONS=OFF"
+                       -DLLVM_ENABLE_ASSERTIONS=OFF \
+                       -DLLVM_ENABLE_Z3_SOLVER=OFF"
 fi
 
 # ====================== Choose build script ======================
@@ -58,6 +59,7 @@ log "This step can take 30 minutes to several hours depending on hardware."
 
 chmod +x "./$BUILD_SCRIPT"
 
+# Run the build with environment variables
 if ./"$BUILD_SCRIPT"; then
     log "Fil-C build completed successfully."
 else
