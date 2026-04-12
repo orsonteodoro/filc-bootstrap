@@ -12,15 +12,23 @@ wget https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/debian-12.1
 # Create virtual disk
 qemu-img create -f qcow2 debian.qcow2 40G
 
-# The below assumes the host's RAM is 8192 and guest has 8 GiB RAM and 8 GiB
-# swap for guest to prevent OOM killer from breaking build and linking.
+#
+# The GUEST_VM_RAM should be RAM_HOST/2 or RAM_HOST/4 to prevent swapping.
+# The GUEST_VM_SWAP should be 16384 - RAM_HOST/2
+# DO NOT USE GUEST_VM_RAM == RAM_HOST.
+#
+# Use one of the following recommened combos:
+# 8 GiB host, 4 GiB RAM, 12 Swap, 16 GiB total VM Memory
+# 16 GiB host, 8 GiB RAM, 8 Swap, 16 GiB total VM Memory
+# 32 GiB host, 16 GiB RAM, 0 Swap, 16 GiB total VM Memory
+#
 
 # Contents of ~/qemu-debian/setup.sh (to boot the installer)
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
-  -smp 6 \
+  -smp 4 \
   -nic user,model=virtio \
   -drive file=debian.qcow2,format=qcow2,if=virtio \
   -cdrom debian-12.10.0-amd64-netinst.iso \
@@ -35,8 +43,8 @@ chmod +x setup.sh
 # Install debian
 # Install is done
 
-# 1. Create an 8 GiB swap file
-fallocate -l 8G /swapfile
+# 1. Create an 12 GiB swap file
+fallocate -l 12G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
 swapon /swapfile
@@ -58,7 +66,7 @@ qemu-system-x86_64 \
   -enable-kvm \
   -m 16384 \
   -cpu host \
-  -smp 6 \
+  -smp 4 \
   -nic user,model=virtio \
   -drive file=debian.qcow2,format=qcow2,if=virtio \
   -display gtk \
