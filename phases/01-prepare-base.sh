@@ -95,11 +95,12 @@ fi
 log "Fil-C source ready."
 log "Current commit: $(git rev-parse --short HEAD) - $(git log -1 --oneline)"
 
-# ====================== Install Dependencies ======================
+# ====================== Install Dependencies (Aggressive) ======================
 log "Installing build dependencies..."
 
 if [[ "$DISTRO" == "alpine" ]]; then
     log "Alpine detected - installing packages with apk..."
+    apk update
     apk add --no-cache \
         bash git curl wget ca-certificates \
         build-base clang clang-dev llvm llvm-dev llvm-static llvm-libs \
@@ -114,8 +115,8 @@ if [[ "$DISTRO" == "alpine" ]]; then
 
 elif [[ "$DISTRO" == "debian" ]]; then
     log "Debian detected - installing packages with apt..."
-    apt-get update
-    apt-get install -y \
+    apt-get update --allow-releaseinfo-change || true
+    apt-get install -y --no-install-recommends \
         git curl wget ca-certificates \
         build-essential clang llvm llvm-dev libclang-dev \
         cmake ninja-build \
@@ -137,12 +138,28 @@ elif [[ "$DISTRO" == "gentoo" ]]; then
         sys-devel/gcc sys-libs/glibc
 
 else
-    log "WARNING: Unknown distro. Trying to install common tools..."
-    command -v apt-get && apt-get install -y git curl wget build-essential || true
-    command -v apk && apk add --no-cache git curl wget build-base || true
+    log "WARNING: Unknown distro. Trying common tools..."
+    command -v apt-get && apt-get update && apt-get install -y git curl wget build-essential || true
+    command -v apk && apk update && apk add --no-cache git curl wget build-base || true
 fi
 
-log "Build dependencies installed (including git)."
+# Final git verification
+if ! command -v git >/dev/null; then
+    log "ERROR: git is still not available after package installation"
+    log "Trying emergency git installation..."
+    if [[ "$DISTRO" == "debian" ]]; then
+        apt-get install -y git
+    elif [[ "$DISTRO" == "alpine" ]]; then
+        apk add --no-cache git
+    fi
+fi
+
+if command -v git >/dev/null; then
+    log "✅ git is now available"
+else
+    log "ERROR: git could not be installed"
+    exit 1
+fi
 
 # ====================== Snapshot ======================
 if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
