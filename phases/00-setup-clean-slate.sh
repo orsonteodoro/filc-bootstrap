@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Calculate host paths VERY EARLY
 HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
-# HOST_SCRIPT_DIR now points to the filc-bootstrap directory itself
+# HOST_SCRIPT_DIR now points to the filc-bootstrap directory itselfC
 
 source "$HOST_SCRIPT_DIR/config.sh"
 

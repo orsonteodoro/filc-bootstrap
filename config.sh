@@ -35,7 +35,7 @@ export CXXFLAGS="${CFLAGS}"
 export LOG_DIR="./logs"
 export CHECKPOINT_DIR="./checkpoints"
 export BACKUP_DIR="./backups"
-export FILC_SOURCE_DIR="./sources/fil-c"
+export FILC_SOURCE_DIR="/root/filc-bootstrap/sources/fil-c"
 
 # ====================== Safety & Recovery ======================
 export CREATE_SNAPSHOTS=true

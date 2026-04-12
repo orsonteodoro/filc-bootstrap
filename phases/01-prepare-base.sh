@@ -49,66 +49,43 @@ log "DNS is working."
 # ====================== Git Cache Setup ======================
 mkdir -p "$GIT_CACHE_DIR"
 
-# ====================== Clone / Update Fil-C (with cache + pinned commit support) ======================
+# ====================== Clone / Update Fil-C ======================
 log "Setting up Fil-C source at $FILC_SOURCE_DIR"
 
-if [[ -d "$FILC_SOURCE_DIR/.git" ]]; then
+# Use absolute path inside chroot
+ABS_FILC_SOURCE_DIR="/root/filc-bootstrap/sources/fil-c"
+
+if [[ -d "$ABS_FILC_SOURCE_DIR/.git" ]]; then
     log "Updating existing Fil-C repository..."
-    cd "$FILC_SOURCE_DIR"
+    cd "$ABS_FILC_SOURCE_DIR"
     git fetch --progress origin
 else
     log "Cloning Fil-C repository..."
-    mkdir -p "$(dirname "$FILC_SOURCE_DIR")"
-
-    if [[ -d "$GIT_CACHE_DIR/fil-c.git" ]]; then
-        log "Using git cache for faster clone..."
-        git clone --reference "$GIT_CACHE_DIR/fil-c.git" --progress "$FILC_REPO" "$FILC_SOURCE_DIR"
-    else
-        if [[ "$GIT_SHALLOW" == "true" && -z "$FILC_COMMIT" && "$FILC_USE_TAG" != "true" ]]; then
-            git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
-        else
-            git clone --progress --branch "$FILC_BRANCH" "$FILC_REPO" "$FILC_SOURCE_DIR"
-        fi
-        # Create cache for future runs
-        cp -a "$FILC_SOURCE_DIR/.git" "$GIT_CACHE_DIR/fil-c.git" 2>/dev/null || true
-    fi
-    cd "$FILC_SOURCE_DIR"
+    mkdir -p "$(dirname "$ABS_FILC_SOURCE_DIR")"
+    git clone --progress --depth 1 --branch "$FILC_BRANCH" "$FILC_REPO" "$ABS_FILC_SOURCE_DIR"
+    cd "$ABS_FILC_SOURCE_DIR"
 fi
 
 # Checkout logic
 git checkout "$FILC_BRANCH" || true
 
-if [[ "$FILC_USE_TAG" == "true" && -n "$FILC_TAG" ]]; then
-    log "Checking out tag: $FILC_TAG"
-    git fetch --tags --progress
-    git checkout "$FILC_TAG" || log "WARNING: Tag $FILC_TAG not found"
-elif [[ -n "$FILC_COMMIT" ]]; then
+if [[ -n "$FILC_COMMIT" ]]; then
     log "Pinning to commit: $FILC_COMMIT"
-    if git cat-file -e "$FILC_COMMIT" 2>/dev/null; then
-        git checkout "$FILC_COMMIT"
-    else
-        log "Fetching specific commit..."
-        git fetch origin "$FILC_COMMIT"
-        git checkout "$FILC_COMMIT"
-    fi
-    log "Successfully checked out commit $FILC_COMMIT"
+    git fetch origin "$FILC_COMMIT" || true
+    git checkout "$FILC_COMMIT" || log "WARNING: Commit not found, staying on branch"
 fi
 
-# Final verification with recovery
-log "FILC_SOURCE_DIR:  $FILC_SOURCE_DIR"
-log "FILC_SOURCE_DIR/build_all_fast_glibc.sh:  $FILC_SOURCE_DIR/build_all_fast_glibc.sh"
-if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "WARNING: build scripts not found after checkout. Resetting to branch tip..."
+# Final verification with absolute path
+if [[ ! -f "$ABS_FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
+    log "WARNING: build_all_fast_glibc.sh not found. Resetting to branch tip..."
     git checkout "$FILC_BRANCH"
     git pull --ff-only --progress || true
 fi
 
-log "FILC_SOURCE_DIR:  $FILC_SOURCE_DIR"
-log "FILC_SOURCE_DIR/build_all_fast_glibc.sh:  $FILC_SOURCE_DIR/build_all_fast_glibc.sh"
-if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
+if [[ ! -f "$ABS_FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
     log "ERROR: Fil-C build scripts still not found!"
-    log "Current directory: $(pwd)"
-    ls -la
+    log "Expected path: $ABS_FILC_SOURCE_DIR"
+    ls -la "$ABS_FILC_SOURCE_DIR"
     exit 1
 fi
 
