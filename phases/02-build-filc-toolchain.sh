@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Force integrated assembler)
+# Phase 02 - Build Fil-C Toolchain (Stronger integrated assembler + lld)
 # =============================================================================
 
 set -euo pipefail
@@ -23,13 +23,20 @@ log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 log "Target libc: $FILC_LIBC"
 
-# ====================== Fix for Alpine/Debian ======================
+# ====================== Force Integrated Assembler + lld (Critical for CFI errors) ======================
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
-    log "Forcing Clang integrated assembler to avoid .lbe pseudo-op error..."
+    log "Forcing Clang integrated assembler and lld to fix CFI / pseudo-op errors..."
 
     export CC="clang -integrated-as"
     export CXX="clang++ -integrated-as"
-    export CMAKE_ARGS="-DLLVM_USE_LINKER=lld -DCMAKE_ASM_COMPILER=clang -DCMAKE_ASM_FLAGS=-integrated-as"
+    export ASM="clang -integrated-as"
+
+    export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
+                       -DCMAKE_ASM_COMPILER=clang \
+                       -DCMAKE_ASM_FLAGS=-integrated-as \
+                       -DLLVM_INCLUDE_TESTS=OFF \
+                       -DLLVM_BUILD_TESTS=OFF \
+                       -DLLVM_ENABLE_ASSERTIONS=OFF"
 fi
 
 # ====================== Choose build script ======================
