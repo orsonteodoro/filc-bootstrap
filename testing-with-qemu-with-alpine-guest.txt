@@ -22,6 +22,8 @@ qemu-img create -f qcow2 alpine.qcow2 40G
 # 16 GiB host, 8 GiB RAM, 8 Swap, 16 GiB total VM Memory
 # 32 GiB host, 16 GiB RAM, 0 Swap, 16 GiB total VM Memory
 #
+# Change the -m arg for the VM based on `GUEST_VM_RAM=4; echo $((1024 * GUEST_VM_RAM))`
+#
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 qemu-system-x86_64 \
