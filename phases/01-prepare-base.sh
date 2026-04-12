@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 01 - Prepare Base Environment (git installed FIRST)
+# Phase 01 - Prepare Base Environment (Missing hooks are fatal)
 # =============================================================================
 
 set -euo pipefail
@@ -48,67 +48,30 @@ EOF
 fi
 log "DNS is working."
 
-# ====================== Install git FIRST (Critical) ======================
-log "Installing git first (required for cloning Fil-C)..."
+# ====================== Run Distro-specific prepare_deps Hook ======================
+log "Running prepare_deps hook for $DISTRO..."
 
-if [[ "$DISTRO" == "alpine" ]]; then
-    apk update
-    apk add --no-cache git bash ca-certificates
-elif [[ "$DISTRO" == "debian" ]]; then
-    apt-get update --allow-releaseinfo-change || true
-    apt-get install -y --no-install-recommends git curl wget ca-certificates
-elif [[ "$DISTRO" == "gentoo" ]]; then
-    emerge --sync --quiet || log "WARNING: emerge --sync failed"
-    emerge -av --noreplace git
+HOOK_FUNC="${DISTRO}_prepare_deps"
+
+if declare -F "$HOOK_FUNC" > /dev/null; then
+    log "Executing hook: $HOOK_FUNC"
+    "$HOOK_FUNC"
 else
-    log "WARNING: Unknown distro. Trying to install git..."
-    command -v apt-get && apt-get install -y git || true
-    command -v apk && apk add --no-cache git || true
-fi
-
-# Verify git is available
-if ! command -v git >/dev/null; then
-    log "ERROR: git is still not available after installation attempt"
+    log "ERROR: Required hook function $HOOK_FUNC is not defined in hooks.sh!"
+    log "Please add support for $DISTRO in hooks.sh"
     exit 1
 fi
-log "✅ git is available."
 
-# ====================== Install Remaining Dependencies ======================
-log "Installing remaining build dependencies..."
+log "Dependencies installation completed via hook."
 
-if [[ "$DISTRO" == "alpine" ]]; then
-    apk add --no-cache \
-        curl wget build-base clang clang-dev llvm llvm-dev llvm-static llvm-libs \
-        cmake ninja \
-        patchelf rsync tar \
-        libxml2-dev curl-dev \
-        openssl-dev zlib-dev \
-        ncurses-dev readline-dev libedit-dev \
-        libffi-dev python3-dev \
-        bison flex \
-        pkgconf
-
-elif [[ "$DISTRO" == "debian" ]]; then
-    apt-get install -y --no-install-recommends \
-        build-essential clang llvm llvm-dev libclang-dev \
-        cmake ninja-build \
-        autoconf automake libtool bison flex gawk texinfo \
-        patchelf quilt rsync tar \
-        libxml2-dev libcurl4-openssl-dev \
-        libssl-dev zlib1g-dev \
-        libncurses5-dev libreadline-dev libedit-dev \
-        libffi-dev python3-dev \
-        pkg-config
-
-elif [[ "$DISTRO" == "gentoo" ]]; then
-    emerge -av --noreplace \
-        clang llvm cmake ninja \
-        autoconf automake libtool bison flex gawk texinfo \
-        patchelf quilt rsync tar wget curl \
-        sys-devel/gcc sys-libs/glibc
-fi
-
-log "Build dependencies installed."
+# Verify critical tools
+for tool in git clang cmake ninja; do
+    if ! command -v "$tool" >/dev/null; then
+        log "ERROR: Required tool '$tool' is still not available after hook execution"
+        exit 1
+    fi
+done
+log "✅ Core tools (git, clang, cmake, ninja) are available."
 
 # ====================== Clone / Update Fil-C ======================
 log "Setting up Fil-C source at $FILC_SOURCE_DIR"
@@ -126,7 +89,6 @@ else
     cd "$ABS_FILC_SOURCE_DIR"
 fi
 
-# Checkout logic
 git checkout "$FILC_BRANCH" || true
 
 if [[ -n "$FILC_COMMIT" ]]; then
@@ -135,16 +97,8 @@ if [[ -n "$FILC_COMMIT" ]]; then
     git checkout "$FILC_COMMIT" || log "WARNING: Commit not found"
 fi
 
-# Final verification
-if [[ ! -f "$ABS_FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
-    log "WARNING: build scripts not found. Resetting to branch tip..."
-    git checkout "$FILC_BRANCH"
-    git pull --ff-only --progress || true
-fi
-
 if [[ ! -f "$ABS_FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
     log "ERROR: Fil-C build scripts still not found!"
-    log "Expected path: $ABS_FILC_SOURCE_DIR"
     ls -la "$ABS_FILC_SOURCE_DIR"
     exit 1
 fi
@@ -160,6 +114,15 @@ if [[ "$CREATE_SNAPSHOTS" == "true" ]]; then
     tar -czf "$BACKUP_DIR/$SNAPSHOT_NAME" \
         --exclude=/proc --exclude=/sys --exclude=/dev --exclude=/run --exclude=/tmp \
         /bin /usr/bin /lib /usr/lib /etc 2>/dev/null || true
+fi
+
+# ====================== Load Hooks ======================
+# Like requirements.txt - all distro hooks are centralized here
+if [[ -f "$SCRIPT_DIR/hooks.sh" ]]; then
+    source "$SCRIPT_DIR/hooks.sh"
+else
+    log "WARNING: hooks.sh not found. Some distro support may be missing."
+    exit 1
 fi
 
 log "Phase 01 completed successfully!"
