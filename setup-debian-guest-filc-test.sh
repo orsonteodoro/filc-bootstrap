@@ -1,5 +1,5 @@
 #!/bin/bash
-apt update && sudo apt upgrade -y
+apt update && apt upgrade -y
 apt install -y git curl wget build-essential ca-certificates
 
 git clone https://github.com/orsonteodoro/filc-bootstrap.git
