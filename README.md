@@ -31,6 +31,38 @@ Frustrated with the endless stream of memory safety vulnerabilities in large C/C
 
 It combines **invisible capabilities** (InvisiCaps) with a high-performance concurrent garbage collector. The project also includes **Pizlix**, a memory-safe Linux distribution built on top of it.
 
+### Software Build Requirements
+
+**Required:**
+- A C/C++ compiler supporting **C++17** (Clang recommended)
+- `git`
+- `cmake` and `ninja`
+- `patchelf`
+- `wget` or `curl`
+- Basic build tools (`build-base` / `build-essential`)
+
+**Recommended:**
+- Clang + LLVM development headers
+- `libxml2-dev`
+- `libcurl4-openssl-dev` (or equivalent)
+- `pkg-config`
+
+### VM Build Requirements
+
+These define what the VM guest settings.
+
+**Realistic hardware recommendations:**
+
+- **RAM**: 
+  - **Minimum**: 4 GiB (works but will thrash heavily during Phase 02)
+  - **Recommended**: 8–16 GiB (much more comfortable)
+  - **Ideal**: 16+ GiB for full Gentoo rebuilds
+
+- **Disk space**: Minimum 40 GB (60+ GB recommended)
+- **CPU cores**: 4+ cores (6–8 ideal)
+
+**Note:** Phase 02 (building Fil-C toolchain) is the most memory-intensive step.
+
 ### Important Warning: Experimental Status
 
 > **⚠️ Fil-C is still highly experimental (as of 2026)**
@@ -40,6 +72,14 @@ It combines **invisible capabilities** (InvisiCaps) with a high-performance conc
 - **Compatibility**: While the goal is high compatibility, many real-world packages still require patches.
 
 **Use this bootstrap at your own risk.** Excellent for learning and experimentation, but **not recommended for production systems** yet.
+
+### Disadvantages
+
+- **Significant performance overhead**: Typically 1.5× – 4× slower than normal Clang/GCC, with 20–80% higher memory usage.
+- **Sanitizers disabled**: Traditional sanitizers (ASan, UBSan, TSan, etc.) are usually disabled or incompatible because Fil-C provides its own always-on memory safety. This can affect CI testing workflows that rely on sanitizers.
+- **Rebuild everything**: You must rebuild almost the entire userland — prebuilt binaries from normal distros will not work.
+- **Experimental nature**: Code quality is research-grade. Expect rough edges, missing documentation, and occasional breakage.
+- **Limited ecosystem**: Very low adoption. Package support and community help are minimal.
 
 ### Compatibility of Fil-C Built Packages
 
