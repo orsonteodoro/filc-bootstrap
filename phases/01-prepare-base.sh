@@ -106,7 +106,8 @@ if [[ "$DISTRO" == "alpine" ]]; then
         ncurses-dev readline-dev libedit-dev \
         libffi-dev python3-dev \
         bison flex \
-        pkgconf
+        pkgconf \
+        llvm-test-utils
     log "Verifying development headers..."
     ls -ld /usr/include/libxml2 2>/dev/null || log "WARNING: /usr/include/libxml2 not found"
     ls -ld /usr/include/curl 2>/dev/null || log "WARNING: /usr/include/curl not found"
