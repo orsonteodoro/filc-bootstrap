@@ -95,7 +95,8 @@ In short: Once you go full Fil-C, you are mostly on your own for the package eco
 * --update-filc — Only rebuild Fil-C toolchain
 * --recover-lc — Recover only the LC phase
 
-#### Bootstrap PhasesPhase 00: Create clean chroot (Gentoo stage 3 / Debian / Alpine)
+#### Bootstrap Phases
+- Phase 00: Create clean chroot (Gentoo stage 3 / Debian / Alpine)
 - Phase 01: Prepare base environment + dependencies
 - Phase 02: Build Fil-C toolchain (build_all_fast_glibc.sh)
 - Phase 03: Dual-libc LC transition (yolo + user glibc)
