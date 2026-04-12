@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 00 - Setup Clean Slate (Fixed unbound variable + reliable copy)
+# Phase 00 - Setup Clean Slate (Improved Debian handling + safe --fresh)
 # =============================================================================
 
 set -euo pipefail
@@ -9,7 +9,6 @@ set -euo pipefail
 HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
 HOST_BOOTSTRAP_PATH="$HOST_SCRIPT_DIR"
 
-# Now source config
 source "$HOST_SCRIPT_DIR/config.sh"
 
 log() {
@@ -25,11 +24,11 @@ TEST_DISTRO=${TEST_DISTRO:-"debian"}
 ALPINE_MINIROOTFS_URL="https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
 log "Target root: $TARGET_ROOT | Mode: $TEST_MODE ($TEST_DISTRO)"
-log "Host bootstrap path: $HOST_BOOTSTRAP_PATH"
 
-# ====================== Gentle Fresh Wipe ======================
+# ====================== Safe Fresh Wipe ======================
 if [[ "$FORCE_FRESH" == "true" ]]; then
     log "Force fresh enabled — preparing to wipe $TARGET_ROOT"
+
     if [[ "$TARGET_ROOT" == "/" || "$TARGET_ROOT" == "/home" || "$TARGET_ROOT" == "/root" || -z "$TARGET_ROOT" ]]; then
         log "ERROR: Refusing to wipe dangerous path"
         exit 1
@@ -78,18 +77,21 @@ EOF
     apk --root "$TARGET_ROOT" --no-cache add \
         bash git curl wget build-base clang cmake ninja patchelf rsync tar
 
-# ====================== Debian (Default for testing) ======================
+# ====================== Debian (Improved for repeated runs) ======================
 elif [[ "$TEST_MODE" == "true" && "$TEST_DISTRO" == "debian" ]]; then
-    log "Creating clean Debian minbase chroot using debootstrap..."
+    log "Setting up Debian test chroot using debootstrap..."
 
-    if ! command -v debootstrap >/dev/null; then
-        apt-get update && apt-get install -y debootstrap
+    if [[ -d "$TARGET_ROOT/usr" && "$FORCE_FRESH" != "true" ]]; then
+        log "Existing Debian chroot detected. Skipping debootstrap (use --fresh to force recreate)."
+    else
+        if ! command -v debootstrap >/dev/null; then
+            apt-get update && apt-get install -y debootstrap
+        fi
+
+        log "Running debootstrap (this may take a few minutes)..."
+        debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
+        log "Debian chroot created successfully."
     fi
-
-    log "Running debootstrap..."
-    debootstrap --variant=minbase stable "$TARGET_ROOT" http://deb.debian.org/debian
-
-    log "Debian chroot created successfully."
 
 # ====================== Gentoo ======================
 else
@@ -123,11 +125,10 @@ log "Copying filc-bootstrap scripts into chroot using cp -aT..."
 
 mkdir -p "$TARGET_ROOT/root/filc-bootstrap"
 
-log "Copying from: $HOST_BOOTSTRAP_PATH"
-
-cp -aT "$HOST_BOOTSTRAP_PATH" "$TARGET_ROOT/root/filc-bootstrap" || {
-    log "WARNING: cp -aT failed, trying fallback copy..."
-    cp -a "$HOST_BOOTSTRAP_PATH"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
+# Use absolute host path and cp -aT
+cp -aT "$HOST_SCRIPT_DIR" "$TARGET_ROOT/root/filc-bootstrap" || {
+    log "WARNING: cp -aT failed, trying fallback..."
+    cp -a "$HOST_SCRIPT_DIR"/. "$TARGET_ROOT/root/filc-bootstrap/" 2>/dev/null || true
 }
 
 # Verify
