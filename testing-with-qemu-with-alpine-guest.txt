@@ -10,6 +10,9 @@ wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard
 cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 40G
 
+# For RAM with the -m arg in qemu, the recommended value is RAM/2 or RAM/4 to avoid thrashing.
+# The below assumes the host's RAM is 8192 so -m is 4096 for guest VM.
+
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 qemu-system-x86_64 \
   -enable-kvm \

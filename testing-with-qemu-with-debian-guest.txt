@@ -12,10 +12,13 @@ wget https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/debian-12.1
 # Create virtual disk
 qemu-img create -f qcow2 debian.qcow2 40G
 
+# For RAM with the -m arg in qemu, the recommended value is RAM/2 or RAM/4 to avoid thrashing.
+# The below assumes the host's RAM is 8192 so -m is 4096 for guest VM.
+
 # Contents of ~/qemu-debian/setup.sh (to boot the installer)
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
   -smp 6 \
   -nic user,model=virtio \
@@ -34,7 +37,7 @@ chmod +x setup.sh
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
   -smp 6 \
   -nic user,model=virtio \
