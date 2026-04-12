@@ -16,7 +16,7 @@ qemu-img create -f qcow2 alpine.qcow2 40G
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m 8192 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
@@ -37,15 +37,30 @@ setup-alpine
 # Keyboard layout → usually us
 # Disk → choose vda then choose sys mode
 
+# Install is done
+
+# 1. Create an 8 GiB swap file
+fallocate -l 8G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+
+# 2. Make it permanent across reboots
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+# Verify 16 GiB total memory
+free
+
 sync
 # Shutdown vm
 
 # Outside in the host do
 
 # Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
+# The total memory needs to be 16 GiB for possibly worst case scenario for linking at maybe 13 GiB total memory.
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m 16384 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \

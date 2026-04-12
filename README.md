@@ -54,14 +54,16 @@ These define what the VM guest settings.
 **Realistic hardware recommendations:**
 
 - **RAM**: 
-  - **Minimum**: 4 GiB (works but will thrash heavily during Phase 02)
+  - **Minimum**: 8 GiB
   - **Recommended**: 8–16 GiB (much more comfortable)
   - **Ideal**: 16+ GiB for full Gentoo rebuilds
 
 - **Disk space**: Minimum 40 GB (60+ GB recommended)
 - **CPU cores**: 4+ cores (6–8 ideal)
 
-**Note:** Phase 02 (building Fil-C toolchain) is the most memory-intensive step.
+**Note:**
+- Phase 02 (building Fil-C toolchain) is the most memory-intensive step.
+- The total memory should be 16 GiB with swapfile inside the virtual machine.
 
 ### Important Warning: Experimental Status
 
