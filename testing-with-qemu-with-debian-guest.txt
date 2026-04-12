@@ -48,6 +48,8 @@ chmod +x setup2.sh
 ./setup2.sh
 
 # In the Debian guest:
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git
 
 # Download dependencies and filc-bootstrap with
 chmod +x setup-debian-guest-filc-test.sh
