@@ -72,8 +72,12 @@ fi
 
 # ====================== Load Hooks ======================
 # Centralized hook file (like requirements.txt)
-if [[ -f "$SCRIPT_DIR/hooks.sh" ]]; then
-    source "$SCRIPT_DIR/hooks.sh"
+if [[ -f "./hooks.sh" ]]; then
+    source "./hooks.sh"
+    log "hooks.sh loaded successfully."
+elif [[ -f "$HOST_SCRIPT_DIR/hooks.sh" ]]; then
+    source "$HOST_SCRIPT_DIR/hooks.sh"
+    log "hooks.sh loaded successfully from host path."
 else
     log "WARNING: hooks.sh not found. Distro-specific support may be missing."
 fi

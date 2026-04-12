@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-# Calculate host paths VERY EARLY, before sourcing config or any other action
+# Calculate host paths VERY EARLY
 HOST_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
 HOST_BOOTSTRAP_PATH="$HOST_SCRIPT_DIR"
 
