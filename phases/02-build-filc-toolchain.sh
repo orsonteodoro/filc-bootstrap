@@ -36,6 +36,10 @@ if [[ -f /etc/alpine-release ]]; then
     export LIBXML2_INCLUDE_DIR="/usr/include/libxml2"
     export CURL_LIBRARY="/usr/lib/libcurl.so"
     export CURL_INCLUDE_DIR="/usr/include/curl"
+
+    # Disable LLVM testing components that are missing on Alpine
+    export CMAKE_ARGS="-DLLVM_INCLUDE_TESTS=OFF -DLLVM_BUILD_TESTS=OFF -DLLVM_ENABLE_ASSERTIONS=OFF"
+
 fi
 
 # ====================== Choose build script ======================
