@@ -95,12 +95,16 @@ elif [[ -n "$FILC_COMMIT" ]]; then
 fi
 
 # Final verification with recovery
+log "FILC_SOURCE_DIR:  $FILC_SOURCE_DIR"
+log "FILC_SOURCE_DIR/build_all_fast_glibc.sh:  $FILC_SOURCE_DIR/build_all_fast_glibc.sh"
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
     log "WARNING: build scripts not found after checkout. Resetting to branch tip..."
     git checkout "$FILC_BRANCH"
     git pull --ff-only --progress || true
 fi
 
+log "FILC_SOURCE_DIR:  $FILC_SOURCE_DIR"
+log "FILC_SOURCE_DIR/build_all_fast_glibc.sh:  $FILC_SOURCE_DIR/build_all_fast_glibc.sh"
 if [[ ! -f "$FILC_SOURCE_DIR/build_all_fast_glibc.sh" ]]; then
     log "ERROR: Fil-C build scripts still not found!"
     log "Current directory: $(pwd)"
