@@ -5,11 +5,11 @@
 
 set -euo pipefail
 
-# Set SCRIPT_DIR early and consistently
+# === CRITICAL: Set SCRIPT_DIR VERY EARLY ===
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Source config (which loads all hooks)
+# Now source config (which loads all hooks)
 source ./config.sh
 
 log() {
@@ -81,39 +81,26 @@ run_phase() {
 if [[ "$SKIP_CLEAN_SLATE" != "true" ]]; then
     log "Running Phase 00: Clean Slate Setup"
     bash phases/00-setup-clean-slate.sh "$@"
-    # Note: Phase 00 will chroot and continue execution from here via exec
+    # Phase 00 will chroot and continue execution
     exit 0
 fi
 
-# If we reach here, we are inside the chroot (after Phase 00)
-
+# If we reach here, we are inside the chroot
 log "Inside chroot - continuing bootstrap"
 
-# Phase 01: Prepare base + dependencies (via hooks_requirements.sh)
+# Phase 01: Prepare base + dependencies
 run_phase "01-prepare-base.sh"
 
 # Phase 02: Build Fil-C toolchain
 run_phase "02-build-filc-toolchain.sh"
 
-# Phase 03: Dual-libc / LC transition (placeholder for now)
-# run_phase "03-setup-dual-libc.sh"
-
-# Phase 03.5: Basic safety test
-# run_phase "03.5-test-hello-world.sh"
-
-# ====================== Phase 04: Handoff (via hooks_handoff.sh) ======================
+# Phase 04: Final handoff (via hooks_handoff.sh)
 log "=== Starting Phase 04: Final Handoff ==="
-
-if [[ -f "phases/04-handoff.sh" ]]; then
-    bash phases/04-handoff.sh
-else
-    log "ERROR: phases/04-handoff.sh not found!"
-    exit 1
-fi
+run_phase "04-handoff.sh"
 
 log "========================================================================"
 log "filc-bootstrap completed successfully!"
-log "You can now use filcc / fil++ for memory-safe compilation."
+log "You can now use: filcc yourfile.c -o yourfile"
 log "========================================================================"
 
 exit 0
