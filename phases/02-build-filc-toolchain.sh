@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (CC=gcc + ccache wrapper)
+# Phase 02 - Build Fil-C Toolchain (Correct ccache wrapper + CC=gcc)
 # =============================================================================
 
 set -euo pipefail
@@ -22,24 +22,24 @@ cd "$FILC_SOURCE_DIR" || {
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 
-# ====================== Setup CC/CXX with ccache if available ======================
+# ====================== Setup ccache wrapper correctly ======================
 if command -v ccache >/dev/null; then
-    log "ccache detected. Wrapping gcc/g++ with ccache."
-    GCC_WRAPPER="ccache gcc"
-    GXX_WRAPPER="ccache g++"
+    log "ccache detected. Using ccache gcc / ccache g++ wrapper."
+    CC_WRAPPER="ccache gcc"
+    CXX_WRAPPER="ccache g++"
 else
     log "ccache not found. Using plain gcc/g++."
-    GCC_WRAPPER="gcc"
-    GXX_WRAPPER="g++"
+    CC_WRAPPER="gcc"
+    CXX_WRAPPER="g++"
 fi
 
-export CC="${GCC_WRAPPER}"
-export CXX="${GXX_WRAPPER}"
+export CC="${CC_WRAPPER}"
+export CXX="${CXX_WRAPPER}"
 
-log "Using CC=${CC}  CXX=${CXX}"
+log "Final CC=${CC}   CXX=${CXX}"
 
-# ====================== Patch libpas for march and optimization ======================
-log "Patching libpas Makefiles..."
+# ====================== Patch libpas Makefiles ======================
+log "Patching libpas Makefiles to control march and optimization..."
 
 find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
     log "Patching $makefile"
@@ -51,7 +51,7 @@ done
 
 log "libpas patched with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
 
-# ====================== Choose and run build script ======================
+# ====================== Choose build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
 else
@@ -62,6 +62,7 @@ log "Starting build with $BUILD_SCRIPT ..."
 
 chmod +x "./$BUILD_SCRIPT"
 
+# Run the build with the correct wrapper
 if ./"$BUILD_SCRIPT"; then
     log "✅ Fil-C build completed successfully."
 else
