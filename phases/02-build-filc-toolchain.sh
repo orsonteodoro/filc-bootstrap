@@ -28,9 +28,9 @@ export OPT_LEVEL="${OPT_LEVEL:-O2}"
 
 log "Using -march=${MARCH} -${OPT_LEVEL}"
 
-export CFLAGS="-march=${MARCH} -${OPT_LEVEL} -pipe -fPIC -fno-strict-aliasing"
-export CXXFLAGS="${CFLAGS}"
-export LDFLAGS="-Wl,--as-needed"
+#export CFLAGS="-march=${MARCH} -${OPT_LEVEL} -pipe -fPIC -fno-strict-aliasing"
+#export CXXFLAGS="${CFLAGS}"
+#export LDFLAGS="-Wl,--as-needed"
 
 # ====================== Patch libpas Makefiles to respect our flags ======================
 log "Patching libpas Makefiles to respect our CFLAGS..."
@@ -44,10 +44,10 @@ find . -name "Makefile*" -path "*/libpas/*" | while read -r makefile; do
 done
 
 # Also patch any hardcoded flags in libxcrypt configure if needed
-if [[ -f "libxcrypt/configure" ]]; then
-    log "Patching libxcrypt configure for compatibility..."
-    sed -i 's|CFLAGS=.*|CFLAGS="${CFLAGS} ${MARCH_FLAG} ${OPT_FLAG}"|g' libxcrypt/configure || true
-fi
+#if [[ -f "libxcrypt/configure" ]]; then
+#    log "Patching libxcrypt configure for compatibility..."
+#    sed -i 's|CFLAGS=.*|CFLAGS="${CFLAGS} ${MARCH_FLAG} ${OPT_FLAG}"|g' libxcrypt/configure || true
+#fi
 
 # ====================== Force integrated assembler ======================
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
