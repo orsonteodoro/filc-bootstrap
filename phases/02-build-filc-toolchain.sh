@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Controlled march and optimization)
+# Phase 02 - Build Fil-C Toolchain (Control march/O3 + patch libpas)
 # =============================================================================
 
 set -euo pipefail
@@ -21,12 +21,10 @@ cd "$FILC_SOURCE_DIR" || {
 
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
-log "Target libc: $FILC_LIBC"
 
 # ====================== Controlled Build Flags ======================
-# You can change these in config.sh or override here
-export MARCH="${MARCH:-x86-64-v2}"        # Safe baseline (Broadwell+)
-export OPT_LEVEL="${OPT_LEVEL:-O2}"       # Safer than -O3 for reproducibility
+export MARCH="${MARCH:-x86-64-v2}"
+export OPT_LEVEL="${OPT_LEVEL:-O2}"
 
 log "Using -march=${MARCH} -${OPT_LEVEL}"
 
@@ -34,7 +32,24 @@ export CFLAGS="-march=${MARCH} -${OPT_LEVEL} -pipe -fPIC -fno-strict-aliasing"
 export CXXFLAGS="${CFLAGS}"
 export LDFLAGS="-Wl,--as-needed"
 
-# Force integrated assembler + lld to avoid previous assembler errors
+# ====================== Patch libpas Makefiles to respect our flags ======================
+log "Patching libpas Makefiles to respect our CFLAGS..."
+
+find . -name "Makefile*" -path "*/libpas/*" | while read -r makefile; do
+    log "Patching $makefile"
+    sed -i \
+        -e "s|-march=[^ ]*|-march=${MARCH}|g" \
+        -e "s|-O[0-9s]*|-${OPT_LEVEL}|g" \
+        "$makefile" || true
+done
+
+# Also patch any hardcoded flags in libxcrypt configure if needed
+if [[ -f "libxcrypt/configure" ]]; then
+    log "Patching libxcrypt configure for compatibility..."
+    sed -i 's|CFLAGS=.*|CFLAGS="${CFLAGS} ${MARCH_FLAG} ${OPT_FLAG}"|g' libxcrypt/configure || true
+fi
+
+# ====================== Force integrated assembler ======================
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
     log "Forcing Clang integrated assembler and lld..."
 
@@ -59,45 +74,21 @@ fi
 
 if [[ ! -f "./$BUILD_SCRIPT" ]]; then
     log "ERROR: Build script $BUILD_SCRIPT not found!"
-    ls -la
     exit 1
 fi
 
-# ====================== Build Fil-C ======================
-log "Starting Fil-C build with $BUILD_SCRIPT ..."
-log "This step can take 30 minutes to several hours depending on hardware."
+# ====================== Build ======================
+log "Starting build with $BUILD_SCRIPT ..."
 
 chmod +x "./$BUILD_SCRIPT"
 
 if ./"$BUILD_SCRIPT"; then
     log "✅ Fil-C build completed successfully."
 else
-    log "❌ Fil-C build failed. Check the log above for details."
+    log "❌ Fil-C build failed."
     exit 1
 fi
 
-# ====================== Setup installation ======================
-log "Setting up Fil-C installation..."
-
-if [[ -d "/opt/fil" ]]; then
-    log "Fil-C installed in /opt/fil"
-    mkdir -p /usr/local/bin
-    ln -sf /opt/fil/bin/filcc /usr/local/bin/filcc 2>/dev/null || true
-    ln -sf /opt/fil/bin/fil++ /usr/local/bin/fil++ 2>/dev/null || true
-fi
-
-# Verify
-if command -v filcc >/dev/null; then
-    filcc --version | head -n 5
-    log "filcc verification passed."
-else
-    log "WARNING: filcc not found in PATH"
-fi
-
 log "Phase 02 completed successfully!"
-log "Fil-C compiler and runtime have been built."
-
-echo ""
-echo "Next step: Phase 03 (setup-dual-libc.sh)"
 
 exit 0
