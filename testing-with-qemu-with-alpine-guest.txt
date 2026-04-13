@@ -1,7 +1,7 @@
 # Instructions for creating a Alpine guest VM for testing bootstraping before the expensive Gentoo bootstrapping.
 # This is for testing both the bootstrap scripts correctness quickly and musl build.
 
-# WARNING:  Currently this is on testing case is on hold until a llvm annotations dependency can be resolved.
+# WARNING:  Currently this testing case is on hold until the llvm annotations dependency can be resolved.
 # Use the Debian testing instructions instead.
 
 # Outside in the host do
