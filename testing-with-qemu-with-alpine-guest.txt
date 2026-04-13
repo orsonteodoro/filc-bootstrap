@@ -102,10 +102,12 @@ cd ~/
 apk update
 apk add git bash
 
-# For developers add screen
+# For developers/testers add screen for inspecting errors
 apk add screen
 # Increase scrollback
 echo "defscrollback 50000" > ~/.screenrc
+screen
+# Use CTRL a [ to scroll back and to report/fix errors
 
 # Copy the filc-bootstrap repo into the VM
 git clone https://github.com/orsonteodoro/filc-bootstrap.git
