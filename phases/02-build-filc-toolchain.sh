@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Control march/O3 + patch libpas)
+# Phase 02 - Build Fil-C Toolchain (CC=gcc + ccache wrapper)
 # =============================================================================
 
 set -euo pipefail
@@ -22,64 +22,42 @@ cd "$FILC_SOURCE_DIR" || {
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 
-# ====================== Controlled Build Flags ======================
-export MARCH="${MARCH:-x86-64-v2}"
-export OPT_LEVEL="${OPT_LEVEL:-O2}"
+# ====================== Setup CC/CXX with ccache if available ======================
+if command -v ccache >/dev/null; then
+    log "ccache detected. Wrapping gcc/g++ with ccache."
+    GCC_WRAPPER="ccache gcc"
+    GXX_WRAPPER="ccache g++"
+else
+    log "ccache not found. Using plain gcc/g++."
+    GCC_WRAPPER="gcc"
+    GXX_WRAPPER="g++"
+fi
 
-log "Using -march=${MARCH} -${OPT_LEVEL}"
+export CC="${GCC_WRAPPER}"
+export CXX="${GXX_WRAPPER}"
 
-#export CFLAGS="-march=${MARCH} -${OPT_LEVEL} -pipe -fPIC -fno-strict-aliasing"
-#export CXXFLAGS="${CFLAGS}"
-#export LDFLAGS="-Wl,--as-needed"
+log "Using CC=${CC}  CXX=${CXX}"
 
-# ====================== Patch libpas Makefiles to respect our flags ======================
-log "Patching libpas Makefiles to respect our CFLAGS..."
+# ====================== Patch libpas for march and optimization ======================
+log "Patching libpas Makefiles..."
 
-find . -name "Makefile*" -path "*/libpas/*" | while read -r makefile; do
+find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
     log "Patching $makefile"
     sed -i \
-        -e "s|-march=[^ ]*|-march=${MARCH}|g" \
-        -e "s|-O[0-9s]*|-${OPT_LEVEL}|g" \
+        -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
+        -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
         "$makefile" || true
 done
 
-# Also patch any hardcoded flags in libxcrypt configure if needed
-#if [[ -f "libxcrypt/configure" ]]; then
-#    log "Patching libxcrypt configure for compatibility..."
-#    sed -i 's|CFLAGS=.*|CFLAGS="${CFLAGS} ${MARCH_FLAG} ${OPT_FLAG}"|g' libxcrypt/configure || true
-#fi
+log "libpas patched with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
 
-# ====================== Force integrated assembler ======================
-if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
-    log "Forcing Clang integrated assembler and lld..."
-
-    export CC="ccache clang -integrated-as"
-    export CXX="ccache clang++ -integrated-as"
-    export ASM="clang -integrated-as"
-
-    export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
-                       -DCMAKE_ASM_COMPILER=clang \
-                       -DCMAKE_ASM_FLAGS=-integrated-as \
-                       -DLLVM_INCLUDE_TESTS=OFF \
-                       -DLLVM_BUILD_TESTS=OFF \
-                       -DLLVM_ENABLE_ASSERTIONS=OFF"
-fi
-
-# ====================== Choose build script ======================
+# ====================== Choose and run build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
 else
-    export CC=gcc
-    export CC=g++
     BUILD_SCRIPT="build_all_fast_glibc.sh"
 fi
 
-if [[ ! -f "./$BUILD_SCRIPT" ]]; then
-    log "ERROR: Build script $BUILD_SCRIPT not found!"
-    exit 1
-fi
-
-# ====================== Build ======================
 log "Starting build with $BUILD_SCRIPT ..."
 
 chmod +x "./$BUILD_SCRIPT"
