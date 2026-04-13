@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Aggressive fix for .lbe / .byt / CFI errors)
+# Phase 02 - Build Fil-C Toolchain (Controlled march and optimization)
 # =============================================================================
 
 set -euo pipefail
@@ -23,20 +23,23 @@ log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 log "Target libc: $FILC_LIBC"
 
-# ====================== Aggressive Fix for CFI / pseudo-op errors + ccache ======================
+# ====================== Controlled Build Flags ======================
+# You can change these in config.sh or override here
+export MARCH="${MARCH:-x86-64-v2}"        # Safe baseline (Broadwell+)
+export OPT_LEVEL="${OPT_LEVEL:-O2}"       # Safer than -O3 for reproducibility
+
+log "Using -march=${MARCH} -${OPT_LEVEL}"
+
+export CFLAGS="-march=${MARCH} -${OPT_LEVEL} -pipe -fPIC -fno-strict-aliasing"
+export CXXFLAGS="${CFLAGS}"
+export LDFLAGS="-Wl,--as-needed"
+
+# Force integrated assembler + lld to avoid previous assembler errors
 if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
-    log "Applying aggressive integrated assembler fix + ccache..."
+    log "Forcing Clang integrated assembler and lld..."
 
-    # Use ccache if available
-    if command -v ccache >/dev/null; then
-        CC_LAUNCHER="ccache "
-        log "Using ccache for compilation"
-    else
-        CC_LAUNCHER=""
-    fi
-
-    export CC="${CC_LAUNCHER}clang -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
-    export CXX="${CC_LAUNCHER}clang++ -integrated-as -fno-asynchronous-unwind-tables -fno-exceptions"
+    export CC="ccache clang -integrated-as"
+    export CXX="ccache clang++ -integrated-as"
     export ASM="clang -integrated-as"
 
     export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
@@ -44,26 +47,13 @@ if [[ -f /etc/alpine-release || -f /etc/debian_version ]]; then
                        -DCMAKE_ASM_FLAGS=-integrated-as \
                        -DLLVM_INCLUDE_TESTS=OFF \
                        -DLLVM_BUILD_TESTS=OFF \
-                       -DLLVM_ENABLE_ASSERTIONS=OFF \
-                       -DLLVM_ENABLE_Z3_SOLVER=OFF \
-                       -DLLVM_ENABLE_OCAMLDOC=OFF \
-                       -DLLVM_ENABLE_BINDINGS=OFF \
-                       -DLLVM_TARGETS_TO_BUILD=X86 \
-                       -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-                       -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
-fi
-
-if command -v ccache >/dev/null; then
-    log "ccache statistics:"
-    ccache -s | head -n 10
+                       -DLLVM_ENABLE_ASSERTIONS=OFF"
 fi
 
 # ====================== Choose build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
 else
-    export CC=gcc
-    export CXX=g++
     BUILD_SCRIPT="build_all_fast_glibc.sh"
 fi
 

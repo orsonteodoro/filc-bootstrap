@@ -26,6 +26,10 @@ export FILC_LIBC="glibc"
 export FILC_PREFIX="/opt/fil"
 export YOLO_PREFIX="/yolo"
 
+# Build flags - control march and optimization level
+export MARCH="x86-64-v2"      # Safe baseline. Change to x86-64-v3 or native if desired
+export OPT_LEVEL="O2"         # Safer than O3. Use O3 only if you accept the risk
+
 # ====================== Git Optimization ======================
 export GIT_SHALLOW=false
 export GIT_CACHE_DIR="$HOME/.cache/filc-git-cache"
