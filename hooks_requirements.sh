@@ -21,16 +21,18 @@ alpine_prepare_deps() {
         pkgconf
 }
 
-# ====================== Debian prepare_deps Hook ======================
+# ====================== Debian Requirements Hook ======================
 debian_prepare_deps() {
-    log "Debian: Installing dependencies + ccache for faster rebuilds..."
+    log "Debian: Installing dependencies + ccache + GCC for yolo-glibc..."
 
     apt-get update --allow-releaseinfo-change || true
     apt-get install -y --no-install-recommends \
         git curl wget ca-certificates \
-        build-essential clang llvm llvm-dev libclang-dev lld \
+        build-essential \
+        gcc g++ \
+        clang llvm llvm-dev libclang-dev lld \
         cmake ninja-build \
-        ccache \                          # Added: speeds up rebuilds after failures
+        ccache \
         autoconf automake libtool bison flex gawk texinfo \
         patchelf quilt rsync tar \
         libxml2-dev libcurl4-openssl-dev \
@@ -39,11 +41,14 @@ debian_prepare_deps() {
         libffi-dev python3-dev \
         pkg-config
 
-    # Configure ccache (8 GiB cache size is good balance)
-    log "Configuring ccache..."
+    # Configure ccache
     ccache --max-size=8G
-    ccache -z   # reset statistics for clean run
+    ccache -z
     log "✅ ccache enabled with 8 GiB max size"
+
+    # Make sure GCC is the default for yolo-glibc build
+    log "GCC version: $(gcc --version | head -n1)"
+    log "CC points to: $(readlink -f $(which cc) 2>/dev/null || echo 'not set')"
 }
 
 # ====================== Gentoo Requirements Hook ======================
