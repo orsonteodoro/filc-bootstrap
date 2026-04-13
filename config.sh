@@ -3,6 +3,16 @@
 # filc-bootstrap - Configuration file
 # =============================================================================
 
+# ====================== Safe SCRIPT_DIR Setup ======================
+# Ensure SCRIPT_DIR is always defined, even if sourced early
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+    if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    else
+        SCRIPT_DIR="$(pwd)"
+    fi
+fi
+
 # ====================== Fil-C Settings ======================
 export FILC_REPO="https://github.com/pizlonator/fil-c.git"
 export FILC_BRANCH="deluge"
@@ -75,10 +85,7 @@ log_config() {
 }
 
 # ====================== Load Hooks ======================
-# hooks_requirements.sh  → dependency installation hooks
-# hooks_chroot_setup.sh  → chroot setup hooks for Phase 00
-
-for hook_file in "hooks_requirements.sh" "hooks_chroot_setup.sh"; do
+for hook_file in "hooks_requirements.sh" "hooks_chroot_setup.sh" "hooks_handoff.sh"; do
     if [[ -f "$SCRIPT_DIR/$hook_file" ]]; then
         source "$SCRIPT_DIR/$hook_file"
         log "$hook_file loaded successfully."
