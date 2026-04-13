@@ -23,15 +23,20 @@ alpine_prepare_deps() {
 
 # ====================== Debian Requirements Hook ======================
 debian_prepare_deps() {
-    log "Debian: Installing dependencies + ccache + build tools for yolo-glibc..."
+    log "Debian: Installing dependencies + ccache + tools for yolo-glibc..."
 
-    apt-get update --allow-releaseinfo-change || true
+    # Force a clean and complete package list update
+    apt-get update --allow-releaseinfo-change -qq || {
+        log "WARNING: apt-get update failed, trying with --fix-missing"
+        apt-get update --allow-releaseinfo-change --fix-missing || true
+    }
+
     apt-get install -y --no-install-recommends \
         git curl wget ca-certificates \
         build-essential \
         gcc g++ \
-        ruby \                          # Required by glibc configure for yolo-glibc
-        libc6-dev \                     # Provides stddef.h and other basic headers
+        ruby \
+        libc6-dev \
         linux-libc-dev \
         clang llvm llvm-dev libclang-dev lld \
         cmake ninja-build \
@@ -42,7 +47,11 @@ debian_prepare_deps() {
         libssl-dev zlib1g-dev \
         libncurses5-dev libreadline-dev libedit-dev \
         libffi-dev python3-dev \
-        pkg-config
+        pkg-config || {
+            log "ERROR: Some packages failed to install. Retrying with --fix-missing..."
+            apt-get install -y --no-install-recommends --fix-missing \
+                ruby libc6-dev linux-libc-dev build-essential || die "Critical packages still missing"
+        }
 
     # Configure ccache
     ccache --max-size=8G
@@ -50,8 +59,10 @@ debian_prepare_deps() {
     log "✅ ccache enabled with 8 GiB max size"
 
     log "GCC version: $(gcc --version | head -n1)"
-    log "Ruby version: $(ruby --version)"
-    log "stddef.h location: $(find /usr -name stddef.h 2>/dev/null | head -n 3)"
+    log "Ruby version: $(ruby --version 2>/dev/null || echo 'not found')"
+    log "stddef.h location: $(find /usr -name stddef.h 2>/dev/null | head -n 3 || echo 'not found')"
+
+    log "✅ Debian dependencies installed successfully."
 }
 
 # ====================== Gentoo Requirements Hook ======================
