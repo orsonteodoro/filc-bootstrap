@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Correct ccache wrapper + CC=gcc)
+# Phase 02 - Build Fil-C Toolchain (Clean version - no ccache)
 # =============================================================================
 
 set -euo pipefail
@@ -22,34 +22,23 @@ cd "$FILC_SOURCE_DIR" || {
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 
-# ====================== Setup ccache wrapper correctly ======================
-if command -v ccache >/dev/null; then
-    log "ccache detected. Using ccache gcc / ccache g++ wrapper."
-    CC_WRAPPER="ccache gcc"
-    CXX_WRAPPER="ccache g++"
-else
-    log "ccache not found. Using plain gcc/g++."
-    CC_WRAPPER="gcc"
-    CXX_WRAPPER="g++"
+# ====================== Force GCC for yolo-glibc (critical) ======================
+export CC="gcc"
+export CXX="g++"
+
+log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
+
+# ====================== Optional: Patch libpas (if you still want march/O control) ======================
+if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then
+    log "Applying libpas patch with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
+
+    find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
+        sed -i \
+            -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
+            -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
+            "$makefile" || true
+    done
 fi
-
-export CC="${CC_WRAPPER}"
-export CXX="${CXX_WRAPPER}"
-
-log "Final CC=${CC}   CXX=${CXX}"
-
-# ====================== Patch libpas Makefiles ======================
-log "Patching libpas Makefiles to control march and optimization..."
-
-find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
-    log "Patching $makefile"
-    sed -i \
-        -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
-        -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
-        "$makefile" || true
-done
-
-log "libpas patched with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
 
 # ====================== Choose build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
@@ -62,7 +51,6 @@ log "Starting build with $BUILD_SCRIPT ..."
 
 chmod +x "./$BUILD_SCRIPT"
 
-# Run the build with the correct wrapper
 if ./"$BUILD_SCRIPT"; then
     log "✅ Fil-C build completed successfully."
 else
