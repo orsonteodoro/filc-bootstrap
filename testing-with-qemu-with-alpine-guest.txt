@@ -80,15 +80,18 @@ qemu-system-x86_64 \
 chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
-# Inside the Alpine guest do
+# In the Alpine guest do
 
-# 1. Create an 12 GiB swap file
-fallocate -l 12G /swapfile
+# Create a 12 GiB swap file
+GUEST_VM_TOTAL_MEMORY=16
+GUEST_VM_RAM=4
+GUEST_VM_SWAP=$(( ${GUEST_VM_TOTAL_MEMORY} - ${GUEST_VM_RAM} ))
+fallocate -l ${GUEST_VM_SWAP}G /swapfile
 chmod 600 /swapfile
 mkswap /swapfile
 swapon /swapfile
 
-# 2. Make it permanent across reboots
+# Make it permanent across reboots
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 # Verify 16 GiB total memory
