@@ -23,13 +23,16 @@ alpine_prepare_deps() {
 
 # ====================== Debian Requirements Hook ======================
 debian_prepare_deps() {
-    log "Debian: Installing dependencies + ccache + GCC for yolo-glibc..."
+    log "Debian: Installing dependencies + ccache + build tools for yolo-glibc..."
 
     apt-get update --allow-releaseinfo-change || true
     apt-get install -y --no-install-recommends \
         git curl wget ca-certificates \
         build-essential \
         gcc g++ \
+        ruby \                          # Required by glibc configure for yolo-glibc
+        libc6-dev \                     # Provides stddef.h and other basic headers
+        linux-libc-dev \
         clang llvm llvm-dev libclang-dev lld \
         cmake ninja-build \
         ccache \
@@ -46,9 +49,9 @@ debian_prepare_deps() {
     ccache -z
     log "✅ ccache enabled with 8 GiB max size"
 
-    # Make sure GCC is the default for yolo-glibc build
     log "GCC version: $(gcc --version | head -n1)"
-    log "CC points to: $(readlink -f $(which cc) 2>/dev/null || echo 'not set')"
+    log "Ruby version: $(ruby --version)"
+    log "stddef.h location: $(find /usr -name stddef.h 2>/dev/null | head -n 3)"
 }
 
 # ====================== Gentoo Requirements Hook ======================
