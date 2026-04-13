@@ -26,11 +26,14 @@ qemu-img create -f qcow2 debian.qcow2 80G
 #
 
 # Contents of ~/qemu-debian/setup.sh (to boot the installer)
+#!/bin/bash
+GUEST_VM_NCORES=4
+GUEST_VM_RAM=4096
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m ${GUEST_VM_RAM} \
   -cpu host \
-  -smp 4 \
+  -smp ${GUEST_VM_NCORES} \
   -nic user,model=virtio \
   -drive file=debian.qcow2,format=qcow2,if=virtio \
   -cdrom debian-12.10.0-amd64-netinst.iso \
@@ -42,35 +45,28 @@ qemu-system-x86_64 \
 chmod +x setup.sh
 ./setup.sh
 
-# Install debian
+# Install debian.
 # For most options, use the defaults except swap space.
 # Delete the swap parition.  We will use a swap file instead.
-# Install is done
+# Disable the graphical install options.
+# Install is done.
 
-# 1. Create an 12 GiB swap file
-fallocate -l 12G /swapfile
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-
-# 2. Make it permanent across reboots
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-
-sync
-# Shutdown vm
+# Let the installer restart.
+# When it reaches Grub, shutdown the VM.
 
 # Outside in the host do
 
-# Verify 16 GiB total memory
-free
-
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
-# The total memory needs to be 16 GiB for possibly worst case scenario for linking at maybe 13 GiB total memory.
+#!/bin/bash
+# The total memory needs to be 16 GiB for possibly worst case scenario for
+# linking.
+GUEST_VM_NCORES=4
+GUEST_VM_RAM=4096
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m ${GUEST_VM_RAM} \
   -cpu host \
-  -smp 4 \
+  -smp ${GUEST_VM_NCORES} \
   -nic user,model=virtio \
   -drive file=debian.qcow2,format=qcow2,if=virtio \
   -display gtk \
@@ -82,6 +78,19 @@ chmod +x setup2.sh
 ./setup2.sh
 
 # In the Debian guest:
+
+# Create an 12 GiB swap file
+fallocate -l 12G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+
+# Make it permanent across reboots
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+# Verify 16 GiB total memory
+free
+
 cd ~/
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git

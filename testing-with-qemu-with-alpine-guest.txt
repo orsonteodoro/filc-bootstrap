@@ -29,11 +29,14 @@ qemu-img create -f qcow2 alpine.qcow2 80G
 #
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
+#!/bin/bash
+GUEST_VM_NCORES=4
+GUEST_VM_RAM=4096
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m ${GUEST_VM_RAM} \
   -cpu host \
-  -smp 4 \
+  -smp ${GUEST_VM_NCORES} \
   -nic user,model=virtio \
   -drive file=alpine.qcow2,format=qcow2,if=virtio \
   -cdrom alpine-standard-3.23.0-x86_64.iso \
@@ -52,7 +55,32 @@ setup-alpine
 # Keyboard layout → usually us
 # Disk → choose vda then choose sys mode
 
-# Install is done
+# Install is done.
+
+sync
+# Shutdown the VM.
+
+# Outside in the host do
+
+# Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
+#!/bin/bash
+# The total memory needs to be 16 GiB for possibly worst case scenario for
+# linking.
+GUEST_VM_NCORES=4
+GUEST_VM_RAM=4096
+qemu-system-x86_64 \
+  -enable-kvm \
+  -m ${GUEST_VM_RAM} \
+  -cpu host \
+  -smp ${GUEST_VM_NCORES} \
+  -nic user,model=virtio \
+  -drive file=alpine.qcow2,format=qcow2,if=virtio \
+  -display gtk \
+  -vga virtio
+chmod +x ~/qemu-alpine/setup2.sh
+./setup2.sh
+
+# Inside the Alpine guest do
 
 # 1. Create an 12 GiB swap file
 fallocate -l 12G /swapfile
@@ -62,27 +90,6 @@ swapon /swapfile
 
 # 2. Make it permanent across reboots
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
-
-sync
-# Shutdown vm
-
-# Outside in the host do
-
-# Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
-# The total memory needs to be 16 GiB for possibly worst case scenario for linking at maybe 13 GiB total memory.
-qemu-system-x86_64 \
-  -enable-kvm \
-  -m 4096 \
-  -cpu host \
-  -smp 4 \
-  -nic user,model=virtio \
-  -drive file=alpine.qcow2,format=qcow2,if=virtio \
-  -display gtk \
-  -vga virtio
-chmod +x ~/qemu-alpine/setup2.sh
-./setup2.sh
-
-# Inside the Alpine guest do
 
 # Verify 16 GiB total memory
 free
