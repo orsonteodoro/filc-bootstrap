@@ -24,14 +24,33 @@ debian_handoff() {
 gentoo_handoff() {
     log "Gentoo: Performing final handoff to filc-overlay..."
 
-    # This is where we would:
-    # - Add the filc-overlay to /etc/portage/repos.conf
-    # - Set CC=filcc and CXX=fil++ in make.conf
-    # - Emerge @system and @world with the new compiler
+    # Create symlinks
+    mkdir -p /usr/local/bin
+    ln -sf /opt/fil/bin/filcc /usr/local/bin/filcc 2>/dev/null || true
+    ln -sf /opt/fil/bin/fil++ /usr/local/bin/fil++ 2>/dev/null || true
 
-    log "Gentoo handoff hook is a placeholder for now."
-    log "TODO: Integrate with filc-overlay and set compiler in make.conf"
-    log "      Then run: emerge -e @system && emerge -ve @world"
+    # Basic make.conf adjustments for Fil-C
+    if [[ -f /etc/portage/make.conf ]]; then
+        log "Updating /etc/portage/make.conf for Fil-C..."
+
+        # Backup original
+        cp /etc/portage/make.conf /etc/portage/make.conf.bak 2>/dev/null || true
+
+        # Add Fil-C settings (commented so user can enable them)
+        cat >> /etc/portage/make.conf << 'EOF'
+
+# === Fil-C Configuration (uncomment to enable) ===
+# CC="/opt/fil/bin/filcc"
+# CXX="/opt/fil/bin/fil++"
+# CFLAGS="${CFLAGS} -fPIC"
+# CXXFLAGS="${CXXFLAGS} -fPIC"
+EOF
+    fi
+
+    log "✅ Gentoo handoff completed."
+    log "   filcc and fil++ are available in /usr/local/bin"
+    log "   Next step: emerge -e @system (this will take a long time)"
+    log "   Then: emerge -ve @world"
 }
 
 # ====================== Alpine Handoff Hook ======================

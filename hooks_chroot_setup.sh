@@ -29,6 +29,7 @@ alpine_chroot_setup() {
     MINIROOTFS_FILE="/tmp/alpine-minirootfs-3.23.0-x86_64.tar.gz"
 
     if [[ ! -f "$MINIROOTFS_FILE" ]]; then
+        log "Downloading Alpine minirootfs..."
         wget -c -O "$MINIROOTFS_FILE" "$MINIROOTFS_URL"
     fi
 
@@ -41,13 +42,48 @@ http://dl-cdn.alpinelinux.org/alpine/v3.23/main
 http://dl-cdn.alpinelinux.org/alpine/v3.23/community
 EOF
 
-    apk --root "$TARGET_ROOT" --no-cache add bash git curl wget build-base clang cmake ninja patchelf rsync tar ccache
+    log "Installing base packages into Alpine chroot..."
+    apk --root "$TARGET_ROOT" --no-cache add \
+        bash git curl wget ca-certificates \
+        build-base clang cmake ninja ccache patchelf rsync tar
+
     log "✅ Alpine chroot setup completed."
 }
 
 # ====================== Gentoo Chroot Setup Hook ======================
 gentoo_chroot_setup() {
     log "Gentoo: Setting up clean stage 3 chroot..."
-    # (We can expand this later if needed)
-    log "Gentoo chroot setup not fully implemented yet."
+
+    STAGE3_MIRROR="https://distfiles.gentoo.org/releases/amd64/autobuilds"
+    LATEST_FILE="latest-stage3-amd64.txt"
+    STAGE3_PROFILE="stage3-amd64"
+
+    cd /tmp
+
+    log "Downloading latest Gentoo stage 3 index..."
+    wget -q -O latest-stage3.txt "${STAGE3_MIRROR}/${LATEST_FILE}"
+
+    STAGE3_TARBALL=$(grep -E "${STAGE3_PROFILE}-.*\.tar\.xz$" latest-stage3.txt | awk '{print $1}' | tail -n1)
+    if [[ -z "$STAGE3_TARBALL" ]]; then
+        log "ERROR: Could not find Gentoo stage 3 tarball"
+        exit 1
+    fi
+
+    STAGE3_URL="${STAGE3_MIRROR}/$(dirname "$(grep -E "${STAGE3_PROFILE}" latest-stage3.txt | awk '{print $1}' | tail -n1)")/${STAGE3_TARBALL}"
+
+    log "Downloading Gentoo stage 3: ${STAGE3_TARBALL}"
+    wget -c -O stage3.tar.xz "$STAGE3_URL"
+    wget -c -O stage3.DIGESTS.asc "${STAGE3_URL}.DIGESTS.asc"
+
+    log "Verifying checksum..."
+    sha512sum -c --ignore-missing stage3.DIGESTS.asc || {
+        log "ERROR: Checksum verification failed"
+        exit 1
+    }
+
+    log "Unpacking Gentoo stage 3 into $TARGET_ROOT..."
+    tar xpvf stage3.tar.xz -C "$TARGET_ROOT" --xattrs-include='*.*' --numeric-owner
+
+    log "✅ Gentoo stage 3 chroot setup completed."
+    log "   Stage 3 tarball: ${STAGE3_TARBALL}"
 }

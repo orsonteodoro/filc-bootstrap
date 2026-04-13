@@ -46,15 +46,49 @@ debian_prepare_deps() {
     log "✅ ccache enabled with 8 GiB max size"
 }
 
-# ====================== Gentoo Hooks ======================
+# ====================== Gentoo Requirements Hook ======================
 gentoo_prepare_deps() {
-    log "Gentoo: Installing dependencies..."
-    emerge --sync --quiet || log "WARNING: emerge --sync failed"
+    log "Gentoo: Installing dependencies + ccache..."
+
+    # Sync portage if needed
+    emerge --sync --quiet || log "WARNING: emerge --sync failed (continuing anyway)"
+
     emerge -av --noreplace \
-        git clang llvm cmake ninja lld \
-        autoconf automake libtool bison flex gawk texinfo \
-        patchelf quilt rsync tar wget curl \
-        sys-devel/gcc sys-libs/glibc
+        git \
+        clang \
+        llvm \
+        cmake \
+        ninja \
+        ccache \
+        autoconf \
+        automake \
+        libtool \
+        bison \
+        flex \
+        gawk \
+        texinfo \
+        patchelf \
+        quilt \
+        rsync \
+        tar \
+        wget \
+        curl \
+        sys-devel/gcc \
+        sys-libs/glibc \
+        dev-libs/libxml2 \
+        net-misc/curl
+
+    # Configure ccache for Gentoo
+    if command -v ccache >/dev/null; then
+        log "Configuring ccache for Gentoo..."
+        ccache --max-size=8G
+        ccache -z
+        # Enable ccache in Portage
+        echo 'FEATURES="ccache"' >> /etc/portage/make.conf 2>/dev/null || true
+        log "✅ ccache enabled with 8 GiB max size and Portage integration"
+    fi
+
+    log "Gentoo dependencies installed."
 }
 
 # Future hooks can be added here, e.g.:
