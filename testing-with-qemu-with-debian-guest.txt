@@ -98,6 +98,11 @@ cd ~/
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git
 
+# For developers add screen
+apk install screen
+# Increase scrollback
+echo "defscrollback 50000" > ~/.screenrc
+
 # Download dependencies and filc-bootstrap with
 chmod +x setup-debian-guest-filc-test.sh
 ./setup-debian-guest-filc-test.sh
