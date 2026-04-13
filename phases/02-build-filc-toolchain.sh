@@ -62,6 +62,8 @@ fi
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
 else
+    export CC=gcc
+    export CXX=g++
     BUILD_SCRIPT="build_all_fast_glibc.sh"
 fi
 
