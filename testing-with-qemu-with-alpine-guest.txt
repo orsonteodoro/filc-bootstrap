@@ -30,8 +30,12 @@ qemu-img create -f qcow2 alpine.qcow2 80G
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
-GUEST_VM_NCORES=2 # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_RAM=4096
+# Assumes 4 Core, 8 GiB for host; 2 Core, 4 GiB for guest
+SMOOTHER=2 # Increasing	it makes the host smoother but increases build time
+HOST_NCORES=4
+HOST_RAM=$(( 8 * 1024 ))
+GUEST_VM_NCORES=$(( ${HOST_NCORES} / 2 )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
+GUEST_VM_RAM=$(( ${HOST_RAM} / ${SMOOTHER} ))
 qemu-system-x86_64 \
   -enable-kvm \
   -m ${GUEST_VM_RAM} \
@@ -64,10 +68,12 @@ sync
 
 # Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
 #!/bin/bash
-# The total memory needs to be 16 GiB for possibly worst case scenario for
-# linking.
-GUEST_VM_NCORES=2 # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_RAM=4096
+# Assumes 4 Core, 8 GiB for host; 2 Core, 4 GiB for guest
+SMOOTHER=2 # Increasing	it makes the host smoother but increases build time
+HOST_NCORES=4
+HOST_RAM=$(( 8 * 1024 ))
+GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
+GUEST_VM_RAM=$(( ${HOST_RAM} / ${SMOOTHER} ))
 qemu-system-x86_64 \
   -enable-kvm \
   -m ${GUEST_VM_RAM} \
@@ -84,7 +90,6 @@ chmod +x ~/qemu-alpine/setup2.sh
 
 # Create a 12 GiB swap file
 GUEST_VM_TOTAL_MEMORY=16
-GUEST_VM_RAM=4
 GUEST_VM_SWAP=$(( ${GUEST_VM_TOTAL_MEMORY} - ${GUEST_VM_RAM} ))
 fallocate -l ${GUEST_VM_SWAP}G /swapfile
 chmod 600 /swapfile

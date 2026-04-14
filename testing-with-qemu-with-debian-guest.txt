@@ -27,8 +27,12 @@ qemu-img create -f qcow2 debian.qcow2 80G
 
 # Contents of ~/qemu-debian/setup.sh (to boot the installer)
 #!/bin/bash
-GUEST_VM_NCORES=2 # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_RAM=4096
+# Assumes 4 Core, 8 GiB for host; 2 Core, 4 GiB for guest
+SMOOTHER=2 # Increasing it makes the host smoother but increases build time
+HOST_NCORES=4
+HOST_RAM=$(( 8 * 1024 ))
+GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
+GUEST_VM_RAM=$(( ${HOST_RAM} / ${SMOOTHER} ))
 qemu-system-x86_64 \
   -enable-kvm \
   -m ${GUEST_VM_RAM} \
@@ -58,10 +62,12 @@ chmod +x setup.sh
 
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 #!/bin/bash
-# The total memory needs to be 16 GiB for possibly worst case scenario for
-# linking.
-GUEST_VM_NCORES=2 # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_RAM=4096
+# Assumes 4 Core, 8 GiB for host; 2 Core, 4 GiB for guest
+SMOOTHER=2 # Increasing	it makes the host smoother but increases build time
+HOST_NCORES=4
+HOST_RAM=$(( 8 * 1024 ))
+GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
+GUEST_VM_RAM=$(( ${HOST_RAM} / ${SMOOTHER} ))
 qemu-system-x86_64 \
   -enable-kvm \
   -m ${GUEST_VM_RAM} \
