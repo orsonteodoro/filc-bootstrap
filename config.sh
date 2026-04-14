@@ -35,7 +35,7 @@ export GIT_SHALLOW=false
 export GIT_CACHE_DIR="$HOME/.cache/filc-git-cache"
 
 # ====================== Build Settings ======================
-# Each process is about 4 GiB (rounded to the next 4) or less
+# Each process is about 2.5-3.5 GiB (rounded to the next 4)
 export MAKEOPTS="-j$(( $(nproc)/2 ))" # Assumes 8 GiB total, tries to minimize over swapping
 export CFLAGS="-O2 -pipe -fPIC"
 export CXXFLAGS="${CFLAGS}"
