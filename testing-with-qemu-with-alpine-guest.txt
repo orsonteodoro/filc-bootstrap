@@ -42,7 +42,8 @@ qemu-system-x86_64 \
   -cdrom alpine-standard-3.23.0-x86_64.iso \
   -boot once=d \
   -display gtk \
-  -vga virtio
+  -vga virtio \
+  "$@"
 chmod +x ~/qemu-alpine/setup.sh
 ./setup.sh
 
@@ -77,7 +78,8 @@ qemu-system-x86_64 \
   -nic user,model=virtio \
   -drive file=alpine.qcow2,format=qcow2,if=virtio \
   -display gtk \
-  -vga virtio
+  -vga virtio \
+  "$@"
 chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
