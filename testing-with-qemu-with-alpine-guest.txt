@@ -15,23 +15,16 @@ wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard
 cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 80G
 
-#
-# The GUEST_VM_RAM should be RAM_HOST/2 or RAM_HOST/4 to prevent swapping.
-# The GUEST_VM_SWAP should be 16384 - RAM_HOST/2
-# DO NOT USE GUEST_VM_RAM == RAM_HOST.  It will cause severe swapping.
-#
-# Use one of the following recommened combos:
-# 8 GiB host, 4 GiB RAM, 12 Swap, 16 GiB total VM Memory
-# 16 GiB host, 8 GiB RAM, 8 Swap, 16 GiB total VM Memory
-# 32 GiB host, 16 GiB RAM, 0 Swap, 16 GiB total VM Memory
-#
-# We let the host handle the swapfile issue for the heavy linking memory requirements.
-#
-
 # The following configurations are assumed:
+#
 # SMOOTHER=1:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 4 Core, 16 GiB total memory for guest
 # SMOOTHER=2:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 2 Core, 16 GiB total memory for guest
 # SMOOTHER=4:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 1 Core, 16 GiB total memory for guest
+#
+# We let the host handle the swapfile issue for the heavy linking memory requirements.
+# The host needs at least 16 GiB total memory, because linking can take 12 GiB.
+# HOST_TOTAL_MEMORY = HOST_RAM + HOST_SWAP
+#
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
