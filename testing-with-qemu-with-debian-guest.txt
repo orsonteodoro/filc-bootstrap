@@ -22,7 +22,7 @@ qemu-img create -f qcow2 debian.qcow2 80G
 # 16 GiB host, 8 GiB RAM, 8 Swap, 16 GiB total VM Memory
 # 32 GiB host, 16 GiB RAM, 0 Swap, 16 GiB total VM Memory
 #
-# Change the -m arg for the VM based on `GUEST_VM_RAM=4; echo $((1024 * GUEST_VM_RAM))`
+# We let the host handle the swapfile issue for the heavy linking memory requirements.
 #
 
 # The following configurations are assumed:
