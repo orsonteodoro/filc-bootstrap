@@ -34,9 +34,8 @@ qemu-img create -f qcow2 debian.qcow2 80G
 #!/bin/bash
 SMOOTHER=1 # Increasing it makes the host smoother but increases build time
 HOST_NCORES=4
-HOST_RAM=$(( 16 * 1024 ))
 GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_TOTAL_MEMORY=${HOST_RAM}
+GUEST_VM_TOTAL_MEMORY=$(( 16 * 1024 ))
 qemu-system-x86_64 \
   -enable-kvm \
   -m ${GUEST_VM_TOTAL_MEMORY} \
@@ -70,9 +69,8 @@ chmod +x setup.sh
 #!/bin/bash
 SMOOTHER=1 # Increasing	it makes the host smoother but increases build time
 HOST_NCORES=4
-HOST_RAM=$(( 16 * 1024 ))
 GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_TOTAL_MEMORY=${HOST_RAM}
+GUEST_VM_TOTAL_MEMORY=$(( 16 * 1024 ))
 qemu-system-x86_64 \
   -enable-kvm \
   -m ${GUEST_VM_TOTAL_MEMORY} \
