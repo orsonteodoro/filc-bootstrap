@@ -19,7 +19,7 @@ qemu-img create -f qcow2 debian.qcow2 80G
 # SMOOTHER=4:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 1 Core, 16 GiB total memory for guest
 #
 # We let the host handle the swapfile issue for the heavy linking memory requirements.
-# The host needs at least 16 GiB total memory, because linking can take 12 GiB.
+# The host needs at least 16 GiB total memory, because linking can take 13 GiB.
 # HOST_TOTAL_MEMORY = HOST_RAM + HOST_SWAP
 #
 
