@@ -23,7 +23,7 @@ alpine_prepare_deps() {
 
 # ====================== Debian Requirements Hook ======================
 debian_prepare_deps() {
-    log "Debian: Installing dependencies + mold + tools for yolo-glibc..."
+    log "Debian: Installing dependencies + tools for yolo-glibc..."
 
     # Force enable main + security + updates repositories
     cat > /etc/apt/sources.list <<EOF
@@ -52,9 +52,7 @@ EOF
         libc6-dev \
         linux-libc-dev \
         clang llvm llvm-dev libclang-dev lld \
-        mold \
         cmake ninja-build \
-        ccache \
         autoconf automake libtool bison flex gawk texinfo \
         patchelf quilt rsync tar \
         libxml2-dev libcurl4-openssl-dev \
@@ -64,18 +62,10 @@ EOF
         pkg-config || {
             log "ERROR: Some packages failed to install. Retrying critical ones..."
             apt-get install -y --no-install-recommends --fix-missing \
-                ruby libc6-dev linux-libc-dev build-essential mold gcc g++ || die "Critical packages still missing"
+                ruby libc6-dev linux-libc-dev build-essential gcc g++ || die "Critical packages still missing"
         }
 
-    # Configure ccache (optional)
-    if command -v ccache >/dev/null; then
-        ccache --max-size=8G
-        ccache -z
-        log "✅ ccache enabled with 8 GiB max size"
-    fi
-
     log "GCC version: $(gcc --version | head -n1)"
-    log "Mold version: $(mold --version 2>/dev/null || echo 'not found')"
     log "Ruby version: $(ruby --version 2>/dev/null || echo 'not found')"
     log "stddef.h location: $(find /usr -name stddef.h 2>/dev/null | head -n 3 || echo 'not found')"
 
@@ -84,7 +74,7 @@ EOF
 
 # ====================== Gentoo Requirements Hook ======================
 gentoo_prepare_deps() {
-    log "Gentoo: Installing dependencies + ccache..."
+    log "Gentoo: Installing dependencies..."
 
     # Sync portage if needed
     emerge --sync --quiet || log "WARNING: emerge --sync failed (continuing anyway)"
@@ -95,7 +85,6 @@ gentoo_prepare_deps() {
         llvm \
         cmake \
         ninja \
-        ccache \
         autoconf \
         automake \
         libtool \
@@ -113,16 +102,6 @@ gentoo_prepare_deps() {
         sys-libs/glibc \
         dev-libs/libxml2 \
         net-misc/curl
-
-    # Configure ccache for Gentoo
-    if command -v ccache >/dev/null; then
-        log "Configuring ccache for Gentoo..."
-        ccache --max-size=8G
-        ccache -z
-        # Enable ccache in Portage
-        echo 'FEATURES="ccache"' >> /etc/portage/make.conf 2>/dev/null || true
-        log "✅ ccache enabled with 8 GiB max size and Portage integration"
-    fi
 
     log "Gentoo dependencies installed."
 }

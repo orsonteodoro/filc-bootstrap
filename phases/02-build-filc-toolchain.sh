@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Fixed CMAKE_ARGS + mold support)
+# Phase 02 - Build Fil-C Toolchain (lld only, stable version)
 # =============================================================================
 
 set -euo pipefail
@@ -22,38 +22,31 @@ cd "$FILC_SOURCE_DIR" || {
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 
-# ====================== Initialize variables safely ======================
-export MARCH="${MARCH:-x86-64-v2}"
-export OPT_LEVEL="${OPT_LEVEL:-O2}"
-
-# Initialize CMAKE_ARGS safely
-export CMAKE_ARGS="${CMAKE_ARGS:-}"
-
-# ====================== Setup linker (prefer mold) ======================
-if command -v mold >/dev/null; then
-    log "mold detected. Using mold as linker."
-    export LDFLAGS="-fuse-ld=mold -Wl,--no-keep-memory"
-    CMAKE_ARGS="${CMAKE_ARGS} -DLLVM_USE_LINKER=mold"
-else
-    log "mold not found. Falling back to lld."
-    export LDFLAGS="-fuse-ld=lld --thinlto-jobs=$(nproc) --no-gc-sections --icf=all"
-    CMAKE_ARGS="${CMAKE_ARGS} -DLLVM_USE_LINKER=lld"
-fi
-
 # ====================== Force GCC for yolo-glibc ======================
 export CC="gcc"
 export CXX="g++"
 
 log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
 
-# ====================== Patch libpas (optional) ======================
+# ====================== LLD Configuration ======================
+export LDFLAGS="-fuse-ld=lld --thinlto-jobs=$(nproc) --no-gc-sections --icf=all"
+export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
+                   -DCMAKE_ASM_COMPILER=clang \
+                   -DCMAKE_ASM_FLAGS=-integrated-as \
+                   -DLLVM_INCLUDE_TESTS=OFF \
+                   -DLLVM_BUILD_TESTS=OFF \
+                   -DLLVM_ENABLE_ASSERTIONS=OFF"
+
+log "LLD configured with thinlto-jobs=$(nproc)"
+
+# ====================== Optional libpas patch ======================
 if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then
-    log "Patching libpas with -march=${MARCH} -${OPT_LEVEL}"
+    log "Patching libpas with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
 
     find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
         sed -i \
-            -e "s|-march=[^ ]*|-march=${MARCH}|g" \
-            -e "s|-O[0-9s]*|-${OPT_LEVEL}|g" \
+            -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
+            -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
             "$makefile" || true
     done
 fi

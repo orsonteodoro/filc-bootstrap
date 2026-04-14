@@ -28,7 +28,7 @@ qemu-img create -f qcow2 alpine.qcow2 80G
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
-SMOOTHER=1 # Increasing	it makes the host smoother but increases build time
+SMOOTHER=2 # Increasing	it makes the host smoother but increases build time
 HOST_NCORES=4
 GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
 GUEST_VM_TOTAL_MEMORY=$(( 16 * 1024 ))
@@ -66,7 +66,7 @@ sync
 
 # Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
 #!/bin/bash
-SMOOTHER=1 # Increasing	it makes the host smoother but increases build time
+SMOOTHER=2 # Increasing	it makes the host smoother but increases build time
 HOST_NCORES=4
 GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
 GUEST_VM_TOTAL_MEMORY=$(( 16 * 1024 ))
