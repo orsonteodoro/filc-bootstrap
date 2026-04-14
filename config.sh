@@ -36,7 +36,7 @@ export GIT_CACHE_DIR="$HOME/.cache/filc-git-cache"
 
 # ====================== Build Settings ======================
 # Each process is about 2.5-3.5 GiB (rounded to the next 4)
-export MAKEOPTS="-j$(nproc)" # Do not touch.  Assumes qemu-system-x86_64 -smp $(nproc)/2 from host invocation.
+export MAKEOPTS="-j$(nproc)" # It does not work.  Do not touch.  Change the qemu -smp arg instead.
 export CFLAGS="-O2 -pipe -fPIC"
 export CXXFLAGS="${CFLAGS}"
 
