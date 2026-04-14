@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Clean version - no ccache)
+# Phase 02 - Build Fil-C Toolchain (Try mold linker)
 # =============================================================================
 
 set -euo pipefail
@@ -22,15 +22,26 @@ cd "$FILC_SOURCE_DIR" || {
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 
-# ====================== Force GCC for yolo-glibc (critical) ======================
+# ====================== Setup mold linker (preferred) ======================
+if command -v mold >/dev/null; then
+    log "mold detected. Using mold as linker (faster than lld)."
+    export LDFLAGS="-fuse-ld=mold -Wl,--no-keep-memory"
+    export CMAKE_ARGS="${CMAKE_ARGS} -DLLVM_USE_LINKER=mold"
+else
+    log "mold not found. Falling back to lld."
+    export LDFLAGS="-fuse-ld=lld --thinlto-jobs=$(nproc) --no-gc-sections --icf=all"
+    export CMAKE_ARGS="${CMAKE_ARGS} -DLLVM_USE_LINKER=lld"
+fi
+
+# ====================== Force GCC for yolo-glibc ======================
 export CC="gcc"
 export CXX="g++"
 
 log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
 
-# ====================== Optional: Patch libpas (if you still want march/O control) ======================
+# ====================== Patch libpas (optional march/O control) ======================
 if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then
-    log "Applying libpas patch with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
+    log "Patching libpas with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
 
     find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
         sed -i \

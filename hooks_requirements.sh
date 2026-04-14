@@ -23,11 +23,11 @@ alpine_prepare_deps() {
 
 # ====================== Debian Requirements Hook ======================
 debian_prepare_deps() {
-    log "Debian: Installing dependencies + ccache + tools for yolo-glibc..."
+    log "Debian: Installing dependencies + mold + tools for yolo-glibc..."
 
-    # Force a clean and complete package list update
+    # Force a clean package list update
     apt-get update --allow-releaseinfo-change -qq || {
-        log "WARNING: apt-get update failed, trying with --fix-missing"
+        log "WARNING: apt-get update failed, retrying with --fix-missing"
         apt-get update --allow-releaseinfo-change --fix-missing || true
     }
 
@@ -39,6 +39,7 @@ debian_prepare_deps() {
         libc6-dev \
         linux-libc-dev \
         clang llvm llvm-dev libclang-dev lld \
+        mold \                          # ← Added: preferred fast linker
         cmake ninja-build \
         ccache \
         autoconf automake libtool bison flex gawk texinfo \
@@ -48,17 +49,20 @@ debian_prepare_deps() {
         libncurses5-dev libreadline-dev libedit-dev \
         libffi-dev python3-dev \
         pkg-config || {
-            log "ERROR: Some packages failed to install. Retrying with --fix-missing..."
+            log "ERROR: Some packages failed to install. Retrying critical ones..."
             apt-get install -y --no-install-recommends --fix-missing \
-                ruby libc6-dev linux-libc-dev build-essential || die "Critical packages still missing"
+                ruby libc6-dev linux-libc-dev build-essential mold || die "Critical packages still missing"
         }
 
-    # Configure ccache
-    ccache --max-size=8G
-    ccache -z
-    log "✅ ccache enabled with 8 GiB max size"
+    # Configure ccache (optional, but useful for rebuilds)
+    if command -v ccache >/dev/null; then
+        ccache --max-size=8G
+        ccache -z
+        log "✅ ccache enabled with 8 GiB max size"
+    fi
 
     log "GCC version: $(gcc --version | head -n1)"
+    log "Mold version: $(mold --version 2>/dev/null || echo 'not found')"
     log "Ruby version: $(ruby --version 2>/dev/null || echo 'not found')"
     log "stddef.h location: $(find /usr -name stddef.h 2>/dev/null | head -n 3 || echo 'not found')"
 
