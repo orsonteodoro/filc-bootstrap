@@ -30,7 +30,7 @@ qemu-img create -f qcow2 alpine.qcow2 80G
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
-GUEST_VM_NCORES=4
+GUEST_VM_NCORES=2 # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
 GUEST_VM_RAM=4096
 qemu-system-x86_64 \
   -enable-kvm \
@@ -66,7 +66,7 @@ sync
 #!/bin/bash
 # The total memory needs to be 16 GiB for possibly worst case scenario for
 # linking.
-GUEST_VM_NCORES=4
+GUEST_VM_NCORES=2 # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
 GUEST_VM_RAM=4096
 qemu-system-x86_64 \
   -enable-kvm \
