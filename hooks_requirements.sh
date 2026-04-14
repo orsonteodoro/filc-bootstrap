@@ -25,7 +25,20 @@ alpine_prepare_deps() {
 debian_prepare_deps() {
     log "Debian: Installing dependencies + mold + tools for yolo-glibc..."
 
-    # Force a clean package list update
+    # Force enable main + security + updates repositories
+    cat > /etc/apt/sources.list <<EOF
+deb http://deb.debian.org/debian stable main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian stable main contrib non-free non-free-firmware
+
+deb http://security.debian.org/debian-security stable-security main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security stable-security main contrib non-free non-free-firmware
+
+deb http://deb.debian.org/debian stable-updates main contrib non-free non-free-firmware
+deb-src http://deb.debian.org/debian stable-updates main contrib non-free non-free-firmware
+EOF
+
+    # Clean and full update
+    apt-get clean
     apt-get update --allow-releaseinfo-change -qq || {
         log "WARNING: apt-get update failed, retrying with --fix-missing"
         apt-get update --allow-releaseinfo-change --fix-missing || true
@@ -39,7 +52,7 @@ debian_prepare_deps() {
         libc6-dev \
         linux-libc-dev \
         clang llvm llvm-dev libclang-dev lld \
-        mold \                          # ← Added: preferred fast linker
+        mold \
         cmake ninja-build \
         ccache \
         autoconf automake libtool bison flex gawk texinfo \
@@ -51,10 +64,10 @@ debian_prepare_deps() {
         pkg-config || {
             log "ERROR: Some packages failed to install. Retrying critical ones..."
             apt-get install -y --no-install-recommends --fix-missing \
-                ruby libc6-dev linux-libc-dev build-essential mold || die "Critical packages still missing"
+                ruby libc6-dev linux-libc-dev build-essential mold gcc g++ || die "Critical packages still missing"
         }
 
-    # Configure ccache (optional, but useful for rebuilds)
+    # Configure ccache (optional)
     if command -v ccache >/dev/null; then
         ccache --max-size=8G
         ccache -z
