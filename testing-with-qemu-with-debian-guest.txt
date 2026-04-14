@@ -25,10 +25,14 @@ qemu-img create -f qcow2 debian.qcow2 80G
 # Change the -m arg for the VM based on `GUEST_VM_RAM=4; echo $((1024 * GUEST_VM_RAM))`
 #
 
+# The following configurations are assumed:
+# SMOOTHER=1:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 4 Core, 8 GiB RAM, 8 GiB swap for guest
+# SMOOTHER=2:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 2 Core, 4 GiB RAM, 12 GiB swap for guest
+# SMOOTHER=4:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 1 Core, 1 GiB RAM, 15 GiB swap for guest
+
 # Contents of ~/qemu-debian/setup.sh (to boot the installer)
 #!/bin/bash
-# Assumes 4 Core, 8 GiB for host; 2 Core, 4 GiB for guest
-SMOOTHER=2 # Increasing it makes the host smoother but increases build time
+SMOOTHER=1 # Increasing it makes the host smoother but increases build time
 HOST_NCORES=4
 HOST_RAM=$(( 8 * 1024 ))
 GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
@@ -62,8 +66,7 @@ chmod +x setup.sh
 
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 #!/bin/bash
-# Assumes 4 Core, 8 GiB for host; 2 Core, 4 GiB for guest
-SMOOTHER=2 # Increasing	it makes the host smoother but increases build time
+SMOOTHER=1 # Increasing	it makes the host smoother but increases build time
 HOST_NCORES=4
 HOST_RAM=$(( 8 * 1024 ))
 GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
