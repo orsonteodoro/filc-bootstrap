@@ -73,8 +73,8 @@ echo '/swapfile none swap sw 0 0' >> /etc/fstab
 free
 
 cd ~/
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git
+apt update && apt upgrade -y
+apt install -y git
 
 # For developers/testers add screen for inspecting errors
 apk install screen
