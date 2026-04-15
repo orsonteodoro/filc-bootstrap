@@ -72,12 +72,6 @@ chmod +x setup2.sh
 
 # In the Debian guest do
 
-# Make it permanent
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-
-# Verify >= 16 GiB total memory
-free
-
 cd ~/
 apt update && apt upgrade -y
 apt install -y git
