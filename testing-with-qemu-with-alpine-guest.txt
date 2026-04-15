@@ -15,11 +15,15 @@ wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard
 cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 80G
 
+# For 8 GiB RAM host
+# Use -m 4096 for smoother multitasking.
+# Use -m 8192 for higher throughput.
+
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
@@ -52,7 +56,7 @@ sync
 #!/bin/bash
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \

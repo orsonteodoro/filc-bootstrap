@@ -16,7 +16,7 @@ qemu-img create -f qcow2 debian.qcow2 80G
 #!/bin/bash
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
@@ -48,11 +48,15 @@ chmod +x setup.sh
 
 # Outside in the host do
 
+# For 8 GiB RAM host
+# Use -m 4096 for smoother multitasking.
+# Use -m 8192 for higher throughput.
+
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 #!/bin/bash
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 8192 \
+  -m 4096 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
