@@ -16,12 +16,12 @@ cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 80G
 
 # For 8 GiB RAM host
-# Use -m 4096 for smoother multitasking.
-# Use -m 8192 for higher throughput.
+# Use -m 4096 for smoother multitasking on host.
+# Use -m 8192 for higher throughput on guest VM.
 #
 # For X GiB RAM host
-# Use -m (X * 1024) / 2 for smoother multitasking.
-# Use -m (X * 1024) for higher throughput.
+# Use -m (X * 1024) / 2 for smoother multitasking on host.
+# Use -m (X * 1024) for higher throughput on guest VM.
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
