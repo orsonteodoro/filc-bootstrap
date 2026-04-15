@@ -39,6 +39,7 @@ chmod +x setup.sh
 #   vda
 #     - 69.9 GB Primary ext4 with journal and with boot flag on placed at the beginning of the drive for /
 #     - 16.0 GB Logical swap area
+# Install grub
 
 # Install is done.
 
@@ -68,7 +69,7 @@ chmod +x setup2.sh
 # Make it permanent
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-# Verify 16 GiB total memory
+# Verify >= 16 GiB total memory
 free
 
 cd ~/

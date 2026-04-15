@@ -40,7 +40,6 @@ setup-alpine
 # Password → of your choosing
 # Keyboard layout → usually us
 # Disk → choose vda then choose sys mode
-# No swap partition or swap file in guest
 
 # Install is done.
 
@@ -75,7 +74,7 @@ swapon /swapfile
 # Make it permanent
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-# Verify 16 GiB total memory
+# Verify >= 16 GiB total memory
 free
 
 # Update available packages list and tools required to get filc-bootstrap
