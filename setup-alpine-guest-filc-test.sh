@@ -16,17 +16,7 @@ apk add --no-cache \
 
 echo "Packages installed successfully."
 
-# Create working directory
-mkdir -p ~/filc-test
-cd ~/filc-test
-
-# Clone your repository
-if [[ ! -d filc-bootstrap ]]; then
-    echo "Cloning filc-bootstrap repository..."
-    git clone https://github.com/OrsonTeodoro/filc-bootstrap.git
-fi
-
-cd filc-bootstrap
+cd ~/filc-bootstrap
 
 # Make scripts executable
 chmod +x bootstrap.sh phases/*.sh
