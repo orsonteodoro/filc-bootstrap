@@ -15,19 +15,13 @@ wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard
 cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 80G
 
-# For 8 GiB RAM host
-# Use -m 4096 for smoother multitasking on host.
-# Use -m 8192 for higher throughput on guest VM.
-#
-# For X GiB RAM host
-# Use -m (X * 1024) / 2 for smoother multitasking on host.
-# Use -m (X * 1024) for higher throughput on guest VM.
+# Do not change the -m values.  It may increase linking time.
 
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m 8192 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
@@ -48,6 +42,13 @@ setup-alpine
 # Password → of your choosing
 # Keyboard layout → usually us
 # Disk → choose vda then choose sys mode
+# Manually partition disks as follows if possible
+#   vda
+#     - 84.9 GB Primary ext4 with journal and with boot flag on placed at the beginning of the drive for /
+#     - 1.0 GB Logical swap area
+#
+# * Do not add many more swap until we find out the real reason why.
+#   Adding swap may increase linking time by adding more unnecessary caching.
 
 # Install is done.
 
@@ -60,7 +61,7 @@ sync
 #!/bin/bash
 qemu-system-x86_64 \
   -enable-kvm \
-  -m 4096 \
+  -m 8192 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
