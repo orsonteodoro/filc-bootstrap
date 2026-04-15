@@ -13,7 +13,7 @@ cd ~/qemu-alpine
 wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard-3.23.0-x86_64.iso
 
 cd ~/qemu-alpine
-qemu-img create -f qcow2 alpine.qcow2 80G
+qemu-img create -f raw alpine.raw 80G
 
 # Do not change the -m values.  It may increase linking time.
 
@@ -25,7 +25,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=alpine.qcow2,format=qcow2,if=virtio,cache=none \
+  -drive file=alpine.raw,format=raw,if=virtio \
   -cdrom alpine-standard-3.23.0-x86_64.iso \
   -boot once=d \
   -display gtk \
@@ -65,7 +65,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=alpine.qcow2,format=qcow2,if=virtio,cache=none \
+  -drive file=alpine.raw,format=raw,if=virtio \
   -display gtk \
   -vga virtio \
   "$@"

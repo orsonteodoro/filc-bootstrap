@@ -10,7 +10,7 @@ cd ~/qemu-debian
 wget https://cdimage.debian.org/cdimage/archive/12.10.0/amd64/iso-cd/debian-12.10.0-amd64-netinst.iso
 
 # Create virtual disk
-qemu-img create -f qcow2 debian.qcow2 80G
+qemu-img create -f raw debian.raw 80G
 
 # Do not change the -m values.  It may increase linking time.
 
@@ -22,7 +22,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=debian.qcow2,format=qcow2,if=virtio,cache=none \
+  -drive file=debian.raw,format=raw,if=virtio \
   -cdrom debian-12.10.0-amd64-netinst.iso \
   -boot once=d \
   -display gtk \
@@ -62,7 +62,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=debian.qcow2,format=qcow2,if=virtio,cache=none \
+  -drive file=debian.raw,format=raw,if=virtio \
   -display gtk \
   -vga virtio \
   -usb -device usb-tablet \
