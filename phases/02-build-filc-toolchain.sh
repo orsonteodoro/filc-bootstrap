@@ -28,16 +28,13 @@ export CXX="g++"
 
 log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
 
-# ====================== LLD Configuration ======================
-export LDFLAGS="-fuse-ld=lld --thinlto-jobs=$(nproc) --no-gc-sections --icf=all"
+# ====================== Clang + integrated-as build configuration ======================
 export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
                    -DCMAKE_ASM_COMPILER=clang \
                    -DCMAKE_ASM_FLAGS=-integrated-as \
                    -DLLVM_INCLUDE_TESTS=OFF \
                    -DLLVM_BUILD_TESTS=OFF \
                    -DLLVM_ENABLE_ASSERTIONS=OFF"
-
-log "LLD configured with thinlto-jobs=$(nproc)"
 
 # ====================== Optional libpas patch ======================
 if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then

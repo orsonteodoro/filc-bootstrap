@@ -15,29 +15,13 @@ wget https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/x86_64/alpine-standard
 cd ~/qemu-alpine
 qemu-img create -f qcow2 alpine.qcow2 80G
 
-# The following configurations are assumed:
-#
-# SMOOTHER=1:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 4 Core, 16 GiB total memory for guest
-# SMOOTHER=2:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 2 Core, 16 GiB total memory for guest
-# SMOOTHER=4:  Assumes 4 Core, 8 GiB RAM, 24 GiB swap for host; 1 Core, 16 GiB total memory for guest
-#
-# We let the host handle the swapfile issue for the heavy linking memory requirements.
-# The host needs at least 16 GiB total memory, because linking can take 13 GiB.
-# HOST_TOTAL_MEMORY = HOST_RAM + HOST_SWAP
-#
-
 # Contents of ~/qemu-alpine/setup.sh for distro install:
 #!/bin/bash
-SMOOTHER=4 # Increasing	it makes the host smoother but increases build time
-HOST_NCORES=4
-GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_TOTAL_MEMORY=$(( 16 * 1024 ))
-(( ${GUEST_VM_NCORES} <= 0 )) && GUEST_VM_NCORES=1
 qemu-system-x86_64 \
   -enable-kvm \
-  -m ${GUEST_VM_TOTAL_MEMORY} \
+  -m 4096 \
   -cpu host \
-  -smp ${GUEST_VM_NCORES} \
+  -smp 4 \
   -nic user,model=virtio \
   -drive file=alpine.qcow2,format=qcow2,if=virtio \
   -cdrom alpine-standard-3.23.0-x86_64.iso \
@@ -67,16 +51,11 @@ sync
 
 # Contents of ~/qemu-alpine/setup2.sh to boot without ISO image:
 #!/bin/bash
-SMOOTHER=4 # Increasing	it makes the host smoother but increases build time
-HOST_NCORES=4
-GUEST_VM_NCORES=$(( ${HOST_NCORES} / ${SMOOTHER} )) # This should be HOST_NCORES / 2 for smoother multi tasking on host and reduced thrashing
-GUEST_VM_TOTAL_MEMORY=$(( 16 * 1024 ))
-(( ${GUEST_VM_NCORES} <= 0 )) && GUEST_VM_NCORES=1
 qemu-system-x86_64 \
   -enable-kvm \
-  -m ${GUEST_VM_TOTAL_MEMORY} \
+  -m 4096 \
   -cpu host \
-  -smp ${GUEST_VM_NCORES} \
+  -smp 4 \
   -nic user,model=virtio \
   -drive file=alpine.qcow2,format=qcow2,if=virtio \
   -display gtk \
@@ -86,6 +65,15 @@ chmod +x ~/qemu-alpine/setup2.sh
 ./setup2.sh
 
 # In the Alpine guest do
+
+# Create 12 GiB swapfile
+fallocate -l 12G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+
+# Make it permanent
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 # Verify 16 GiB total memory
 free
