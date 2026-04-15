@@ -74,6 +74,15 @@ chmod +x ~/qemu-alpine/setup2.sh
 
 # In the Alpine guest do
 
+# Create an 12 GiB swap file
+fallocate -l 12G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+
+# Make it permanent across reboots
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
 # Update available packages list and tools required to get filc-bootstrap
 cd ~/
 apk update
