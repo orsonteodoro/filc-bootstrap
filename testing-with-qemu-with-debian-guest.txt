@@ -44,6 +44,7 @@ chmod +x setup.sh
 #
 # * Do not add many more swap until we find out the real reason why.
 #   Adding swap may increase linking time by adding more unnecessary caching.
+# Install grub in /dev/vda
 
 # Install grub
 
