@@ -22,7 +22,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=debian.qcow2,format=qcow2,if=virtio \
+  -drive file=debian.qcow2,format=qcow2,if=virtio,cache=none \
   -cdrom debian-12.10.0-amd64-netinst.iso \
   -boot once=d \
   -display gtk \
@@ -39,7 +39,7 @@ chmod +x setup.sh
 # Disable the graphical install options.
 # Manually partition disks as follows
 #   vda
-#     - 84.9 GB Primary ext4 with journal and with boot flag on placed at the beginning of the drive for /
+#     - 84.9 GB Primary xfs boot flag on placed at the beginning of the drive for /
 #     - 1.0 GB Logical swap area
 #
 # * Do not add many more swap until we find out the real reason why.
@@ -62,7 +62,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=debian.qcow2,format=qcow2,if=virtio \
+  -drive file=debian.qcow2,format=qcow2,if=virtio,cache=none \
   -display gtk \
   -vga virtio \
   -usb -device usb-tablet \
