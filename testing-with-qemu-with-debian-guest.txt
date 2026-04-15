@@ -35,7 +35,10 @@ chmod +x setup.sh
 # For most options, use the defaults except swap space.
 # Delete the swap parition.  We will use a swap file instead.
 # Disable the graphical install options.
-# Keep the swap partition
+# Manually partition disks as follows
+#   vda
+#     - 69.9 GB Primary ext4 with journal and with boot flag on placed at the beginning of the drive for /
+#     - 16.0 GB Logical swap area
 
 # Install is done.
 
@@ -61,12 +64,6 @@ chmod +x setup2.sh
 ./setup2.sh
 
 # In the Debian guest do
-
-# Create 12 GiB swapfile
-fallocate -l 12G /swapfile
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
 
 # Make it permanent
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
