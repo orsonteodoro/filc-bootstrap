@@ -84,6 +84,10 @@ echo "defscrollback 50000" > ~/.screenrc
 screen
 # Use CTRL a [ to scroll back and to report/fix errors
 
+# Copy the filc-bootstrap repo into the VM
+git clone https://github.com/orsonteodoro/filc-bootstrap.git
+cd filc-bootstrap
+
 # Download dependencies and filc-bootstrap with
 chmod +x setup-debian-guest-filc-test.sh
 ./setup-debian-guest-filc-test.sh
