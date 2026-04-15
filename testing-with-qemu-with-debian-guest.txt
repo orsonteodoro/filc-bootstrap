@@ -51,6 +51,10 @@ chmod +x setup.sh
 # For 8 GiB RAM host
 # Use -m 4096 for smoother multitasking.
 # Use -m 8192 for higher throughput.
+#
+# For X GiB RAM host
+# Use -m (X * 1024) / 2 for smoother multitasking.
+# Use -m (X * 1024) for higher throughput.
 
 # Contents of ~/qemu-debian/setup2.sh (to fetch filc-bootstrap)
 #!/bin/bash
