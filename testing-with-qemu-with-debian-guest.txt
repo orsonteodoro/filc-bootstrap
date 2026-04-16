@@ -22,7 +22,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=debian.raw,format=raw,if=virtio \
+  -drive file=debian.raw,format=raw,if=virtio,cache=none \
   -cdrom debian-12.10.0-amd64-netinst.iso \
   -boot once=d \
   -display gtk \
@@ -60,7 +60,7 @@ qemu-system-x86_64 \
   -cpu host \
   -smp 4 \
   -nic user,model=virtio \
-  -drive file=debian.raw,format=raw,if=virtio \
+  -drive file=debian.raw,format=raw,if=virtio,cache=none \
   -display gtk \
   -vga virtio \
   -usb -device usb-tablet \
