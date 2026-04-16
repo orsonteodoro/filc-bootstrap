@@ -100,4 +100,9 @@ cd filc-bootstrap
 
 chmod +x ./setup-alpine-guest-filc-test.sh
 ./setup-alpine-guest-filc-test.sh
+
+# Run the test without a web browser or without a memory hungry program while bootstrapping.
+cd filc-bootstrap
 ./bootstrap.sh --test-alpine
+
+# clang-20 completion expectation:  less than an hour linking.

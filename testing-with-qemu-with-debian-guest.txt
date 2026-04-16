@@ -100,6 +100,8 @@ cd filc-bootstrap
 chmod +x setup-debian-guest-filc-test.sh
 ./setup-debian-guest-filc-test.sh
 
-# Run the test
+# Run the test without a web browser or without a memory hungry program while bootstrapping.
 cd filc-bootstrap
 ./bootstrap.sh --test-debian --fresh
+
+# clang-20 completion expectation:  less than an hour linking.
