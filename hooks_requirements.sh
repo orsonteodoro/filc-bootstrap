@@ -25,18 +25,6 @@ alpine_prepare_deps() {
 debian_prepare_deps() {
     log "Debian: Installing dependencies + tools for yolo-glibc..."
 
-    # Force enable main + security + updates repositories
-    cat > /etc/apt/sources.list <<EOF
-deb http://deb.debian.org/debian stable main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian stable main contrib non-free non-free-firmware
-
-deb http://security.debian.org/debian-security stable-security main contrib non-free non-free-firmware
-deb-src http://security.debian.org/debian-security stable-security main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian stable-updates main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian stable-updates main contrib non-free non-free-firmware
-EOF
-
     # Clean and full update
     apt-get clean
     apt-get update --allow-releaseinfo-change -qq || {
