@@ -32,7 +32,7 @@ debian_prepare_deps() {
         apt-get update --allow-releaseinfo-change --fix-missing || true
     }
 
-    apt-get install -y --no-install-recommends \
+    apt-get install -y --no-install-recommends -f \
         git curl wget ca-certificates \
         build-essential \
         gcc g++ \
