@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (lld only, stable version)
+# Phase 02 - Build Fil-C Toolchain (Safe libxcrypt fix - no system symlink overwrite)
 # =============================================================================
 
 set -euo pipefail
@@ -28,25 +28,34 @@ export CXX="g++"
 
 log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
 
-# ====================== Clang + integrated-as build configuration ======================
-export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
-                   -DCMAKE_ASM_COMPILER=clang \
-                   -DCMAKE_ASM_FLAGS=-integrated-as \
-                   -DLLVM_INCLUDE_TESTS=OFF \
-                   -DLLVM_BUILD_TESTS=OFF \
-                   -DLLVM_ENABLE_ASSERTIONS=OFF"
+# ====================== Safe Fix for libxcrypt configure test ======================
+log "Preparing safe environment for libxcrypt configure test..."
 
-# ====================== Optional libpas patch ======================
-if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then
-    log "Patching libpas with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
+# Point to the actual yolo build output without overwriting system paths
+YOLO_BUILD_DIR="/root/filc-bootstrap/sources/fil-c/pizlonated-yolo-glibc-build"
 
-    find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
-        sed -i \
-            -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
-            -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
-            "$makefile" || true
-    done
-fi
+export LD_LIBRARY_PATH="${YOLO_BUILD_DIR}:${LD_LIBRARY_PATH:-}"
+export PATH="/yolo/bin:${PATH}"
+
+# Create a temporary symlink only for the configure test (in a safe location)
+mkdir -p /tmp/yolo-test-lib
+ln -sf "${YOLO_BUILD_DIR}/ld-linux-x86-64.so.2" /tmp/yolo-test-lib/ld-linux-x86-64.so.2 2>/dev/null || true
+ln -sf "${YOLO_BUILD_DIR}/libc.so.6" /tmp/yolo-test-lib/libc.so.6 2>/dev/null || true
+
+export LD_LIBRARY_PATH="/tmp/yolo-test-lib:${LD_LIBRARY_PATH}"
+
+log "LD_LIBRARY_PATH set for conftest test using staging yolo build"
+
+# ====================== Minimal patch for libpas ======================
+log "Applying minimal patch to libpas..."
+
+find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
+    log "Patching $makefile"
+    sed -i \
+        -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
+        -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
+        "$makefile" || true
+done
 
 # ====================== Choose build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
