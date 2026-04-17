@@ -66,17 +66,6 @@ export LD_LIBRARY_PATH="/tmp/yolo-test-lib:${LD_LIBRARY_PATH}"
 
 log "LD_LIBRARY_PATH set for conftest test using staging yolo build"
 
-# ====================== Minimal patch for libpas ======================
-log "Applying minimal patch to libpas..."
-
-find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
-    log "Patching $makefile"
-    sed -i \
-        -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
-        -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
-        "$makefile" || true
-done
-
 # ====================== Choose build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
