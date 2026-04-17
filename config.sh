@@ -26,18 +26,17 @@ export FILC_LIBC="glibc"
 export FILC_PREFIX="/opt/fil"
 export YOLO_PREFIX="/yolo"
 
-# Build flags - control march and optimization level
-export MARCH="x86-64"      # Change to x86-64-v3 or native only if you know your CPU supports it.  Upstream default is x86-64-v2.
-export OPT_LEVEL="O2"         # Safer than O3. Use O3 only if you accept potential runtime issues.  Upstream default is -O3.
-
 # ====================== Git Optimization ======================
 export GIT_SHALLOW=false
 export GIT_CACHE_DIR="$HOME/.cache/filc-git-cache"
 
 # ====================== Build Settings ======================
-# Each process is about 2.5-3.5 GiB (rounded to the next 4)
-export MAKEOPTS="-j$(nproc)" # It does not work.  Do not touch.  Change the qemu -smp arg instead.
-export CFLAGS="-O2 -pipe -fPIC"
+# Build flags - control march and optimization level
+export MARCH="x86-64"      # Upstream default is x86-64-v2.
+export OPT_LEVEL="O2"      # Upstream default is -O3.
+export DEBUG_LEVEL="g0"    # Upstream default is -g (same as -g2 or balanced debugging)
+export MAKEOPTS="-j$(nproc)"      # It does not work.  Do not touch.  Change the qemu -smp arg instead.
+export CFLAGS="-${OPT_LEVEL} -pipe -fPIC"
 export CXXFLAGS="${CFLAGS}"
 
 # Directories

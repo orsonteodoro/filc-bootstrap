@@ -38,14 +38,50 @@ log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
 
 # ====================== Optional libpas patch ======================
 if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then
-    log "Patching libpas with -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
+    log "Patching -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
 
-    find . -path "*/libpas/*" -name "Makefile*" | while read -r makefile; do
-        sed -i \
-            -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" \
-            -e "s|-O[0-9s]*|-${OPT_LEVEL:-O2}|g" \
-            "$makefile" || true
-    done
+    # Hardcoded -march=x86-64-v2
+    sed -i -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" "libpas/Makefile"
+    sed -i -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" "libpas/Makefile-check"
+
+    DEBUG_LEVEL="${DEBUG_LEVEL:-g}" # Upstream default -g (same as -g2)
+
+    # -O1 upstream
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_jpeg-6b.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_mg.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_ncurses.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_xz.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_zsh.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O}|g" "build_pcre.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O}|g" "build_pcre2.sh"
+
+    # -O3 upstream
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_ada.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_icu.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_libedit.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_perl.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_postgres.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_simdjson.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_simdutf.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_zlib.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "pizlix/build_postlc_chroot_project_perl.sh"
+    sed -i -e "s|-O[0-9s]|-${OPT_LEVEL:-O3}|g" "pizlix/build_postlc_sub2_chroot_part1.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "libpas/Makefile"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "libpas/Makefile"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "libpas/Makefile-check"
+    #sed -i -e "s|-O[0-9s]|-${OPT_LEVEL:-O3}|g" "projects/usermusl/Makefile"
+    #sed -i -e "s|-O[0-9s]|-${OPT_LEVEL:-O3}|g" "projects/yolomusl/Makefile"
+
+    # -O2 upstream
+    sed -i -e "s|-O[0-9s]|-${OPT_LEVEL:-O2}|g" "build_cmake.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_cpython.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_ffi.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_filbox1.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_libpipeline.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_openssl.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_sqlite.sh"
+    sed -i -e "s|-g -O[0-9s]|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_tcl.sh"
+    sed -i -e "s|-O[0-9s] -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_toybox.sh"
 fi
 
 # ====================== Safe LD_LIBRARY_PATH (no '.' ) ======================
