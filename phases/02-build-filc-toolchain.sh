@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Phase 02 - Build Fil-C Toolchain (Fix iconv_prog / iconvconfig segfault)
+# Phase 02 - Build Fil-C Toolchain (with globals patch + symbol replacement)
 # =============================================================================
 
 set -euo pipefail
@@ -22,111 +22,80 @@ cd "$FILC_SOURCE_DIR" || {
 log "Current directory: $(pwd)"
 log "Fil-C branch: $FILC_BRANCH"
 
-# ====================== Force GCC for yolo-glibc ======================
-export CC="gcc"
-export CXX="g++"
+# ====================== 1. Apply globals patch ======================
+log "Applying globals patch: patches/fil-c-0.678-globals.patch"
 
-log "Using CC=gcc  CXX=g++ (required for yolo-glibc)"
-
-# ====================== Clang + integrated-as build configuration ======================
-#export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
-#                   -DCMAKE_ASM_COMPILER=clang \
-#                   -DCMAKE_ASM_FLAGS=-integrated-as \
-#                   -DLLVM_INCLUDE_TESTS=OFF \
-#                   -DLLVM_BUILD_TESTS=OFF \
-#                   -DLLVM_ENABLE_ASSERTIONS=OFF"
-
-# ====================== Optional libpas patch ======================
-if [[ -n "${MARCH:-}" || -n "${OPT_LEVEL:-}" ]]; then
-    log "Patching -march=${MARCH:-x86-64-v2} -${OPT_LEVEL:-O2}"
-
-    DEBUG_LEVEL="${DEBUG_LEVEL:-g}" # Upstream default -g (same as -g2)
-
-    sed -i -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" "libpas/Makefile"
-    sed -i -e "s|-march=[^ ]*|-march=${MARCH:-x86-64-v2}|g" "libpas/Makefile-check"
-
-    sed -i -e "s|-g -O3|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_ada.sh"
-    sed -i -e "s|-O2|-${OPT_LEVEL:-O2}|g" "build_cmake.sh"
-    sed -i -e "s|-g -O2|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_cpython.sh"
-    sed -i -e "s|-O3 -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_icu.sh"
-    sed -i -e "s|-O2 -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_ffi.sh"
-    sed -i -e "s|-O2 -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_filbox1.sh"
-    sed -i -e "s|-O -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_jpeg-6b.sh"
-    sed -i -e "s|-g -O3|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_libedit.sh"
-    sed -i -e "s|-O2 -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_libpipeline.sh"
-    sed -i -e "s|-O -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_mg.sh"
-    sed -i -e "s|-O -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_ncurses.sh"
-    sed -i -e "s|-g -O2|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_openssl.sh"
-    sed -i -e "s|-g -O|-${DEBUG_LEVEL} -${OPT_LEVEL:-O}|g" "build_pcre.sh"
-    sed -i -e "s|-g -O|-${DEBUG_LEVEL} -${OPT_LEVEL:-O}|g" "build_pcre2.sh"
-    sed -i -e "s|-O3 -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_perl.sh"
-    sed -i -e "s|-O3 -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_postgres.sh"
-    sed -i -e "s|-g -O3|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_simdjson.sh"
-    sed -i -e "s|-g -O3|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "build_simdutf.sh"
-    sed -i -e "s|-g -O2|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_sqlite.sh"
-    sed -i -e "s|-g -O2|-${DEBUG_LEVEL} -${OPT_LEVEL:-O2}|g" "build_tcl.sh"
-    sed -i -e "s|-O2 -g|-${OPT_LEVEL:-O2} -${DEBUG_LEVEL}|g" "build_toybox.sh"
-    sed -i -e "s|-O -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_xz.sh"
-    sed -i -e "s|-O3 -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "build_zlib.sh"
-    sed -i -e "s|-O -g|-${OPT_LEVEL:-O} -${DEBUG_LEVEL}|g" "build_zsh.sh"
-    sed -i -e "s|-O3 -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "pizlix/build_postlc_chroot_project_perl.sh"
-    sed -i -e "s|-O3|-${OPT_LEVEL:-O3}|g" "pizlix/build_postlc_sub2_chroot_part1.sh"
-    sed -i -e "s|-g -O3|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "libpas/Makefile"
-    sed -i -e "s|-O3 -g|-${OPT_LEVEL:-O3} -${DEBUG_LEVEL}|g" "libpas/Makefile"
-    sed -i -e "s|-g -O3|-${DEBUG_LEVEL} -${OPT_LEVEL:-O3}|g" "libpas/Makefile-check"
-    #sed -i -e "s|-O3|-${OPT_LEVEL:-O3}|g" "projects/usermusl/Makefile"
-    #sed -i -e "s|-O3|-${OPT_LEVEL:-O3}|g" "projects/yolomusl/Makefile"
+if [[ -f "$SCRIPT_DIR/patches/fil-c-0.678-globals.patch" ]]; then
+    patch -Np1 -i "$SCRIPT_DIR/patches/fil-c-0.678-globals.patch" || {
+        log "WARNING: Patch applied with some offsets or already applied"
+    }
+else
+    log "ERROR: globals patch not found at $SCRIPT_DIR/patches/fil-c-0.678-globals.patch"
+    exit 1
 fi
 
-# ====================== Safe LD_LIBRARY_PATH (no '.' ) ======================
-log "Sanitizing LD_LIBRARY_PATH for glibc configure..."
+# ====================== 2. Source globals ======================
+log "Sourcing globals.sh"
 
-YOLO_BUILD_DIR="/root/filc-bootstrap/sources/fil-c/pizlonated-yolo-glibc-build"
+# Source the globals (use bash version if available, fallback to sh)
+if [[ -f "globals.sh" ]]; then
+    . "./globals.sh"
+else
+    log "ERROR: globals.sh not found!"
+    exit 1
+fi
+
+log "Globals loaded: YOLO_PREFIX=${YOLO_PREFIX}, FIL_PREFIX=${FIL_PREFIX}, LIBDIR=${LIBDIR}"
+
+# ====================== 3. Run replace_symbols.sh ======================
+log "Running replace_symbols.sh to expand @VAR@ placeholders..."
+
+if [[ -f "replace_symbols.sh" ]]; then
+    chmod +x "./replace_symbols.sh"
+    ./replace_symbols.sh || {
+        log "WARNING: replace_symbols.sh returned non-zero (continuing)"
+    }
+else
+    log "WARNING: replace_symbols.sh not found - skipping symbol replacement"
+fi
+
+# ====================== 4. Safe environment for glibc configure ======================
+log "Setting up safe environment for glibc configure tests..."
+
+YOLO_BUILD_DIR="${FILC_SOURCE_DIR}/pizlonated-yolo-glibc-build"
 
 mkdir -p /tmp/yolo-test-lib
 ln -sf "${YOLO_BUILD_DIR}/ld-linux-x86-64.so.2" /tmp/yolo-test-lib/ld-linux-x86-64.so.2 2>/dev/null || true
 ln -sf "${YOLO_BUILD_DIR}/libc.so.6" /tmp/yolo-test-lib/libc.so.6 2>/dev/null || true
 
+# Clean LD_LIBRARY_PATH - remove '.' to satisfy glibc check
 CLEAN_LD_PATH="/tmp/yolo-test-lib:${YOLO_BUILD_DIR}"
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
     CLEAN_LD_PATH="${CLEAN_LD_PATH}:$(echo "${LD_LIBRARY_PATH}" | sed 's|\.:||g; s|::|:|g; s|^:||; s|:$||')"
 fi
-
 export LD_LIBRARY_PATH="${CLEAN_LD_PATH}"
-export PATH="/yolo/bin:${PATH}"
 
-log "Clean LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+export PATH="${YOLO_PREFIX}/bin:${PATH}"
 
-# ====================== Patch libpas/common.sh ======================
-log "Patching libpas/common.sh to bypass Unsupported OS check..."
+log "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
 
-if [[ -f "libpas/common.sh" ]]; then
-    sed -i 's|uname -s|echo Linux|g' "libpas/common.sh" || true
-    sed -i 's|Unsupported OS|Supported for Fil-C bootstrap (bypassed)|g' "libpas/common.sh" || true
-    sed -i 's|exit 1|echo "OS check bypassed" # exit 1 disabled for bootstrap|g' "libpas/common.sh" || true
-fi
-
-find . -path "*/libpas/*" -name "*.sh" | while read -r script; do
-    sed -i 's|Unsupported OS|Supported for bootstrap|g' "$script" || true
-done
-
-log "libpas/common.sh patched."
-
-# ====================== Critical Fix for iconv_prog / iconvconfig segfault ======================
-log "Applying workaround for iconv_prog and iconvconfig linking segfault..."
-
-# Force uninstrumented GCC for the final iconv tools (most common fix)
-export GLIBC_NO_FILC_INSTRUMENT=1   # Tell bootstrap to skip instrumentation for host tools if supported
-export CC_FOR_BUILD="gcc"           # Force plain gcc for build-time tools
+# ====================== 5. Force GCC for yolo-glibc ======================
+export CC="gcc"
+export CXX="g++"
+export CC_FOR_BUILD="gcc"
 export CXX_FOR_BUILD="g++"
 
-# Reduce optimization / disable some passes that may cause ld crash
-export CFLAGS="-O2 -pipe -fPIC -fno-lto"
-export CXXFLAGS="-O2 -pipe -fPIC -fno-lto"
+log "Using CC=gcc / CXX=g++"
 
-log "Forcing CC_FOR_BUILD=gcc and reduced flags for iconv tools"
+# ====================== Clang + integrated-as build configuration ======================
+export CMAKE_ARGS="-DLLVM_USE_LINKER=lld \
+                   -DCMAKE_ASM_COMPILER=clang \
+                   -DCMAKE_ASM_FLAGS=-integrated-as \
+                   -DLLVM_INCLUDE_TESTS=OFF \
+                   -DLLVM_BUILD_TESTS=OFF \
+                   -DLLVM_ENABLE_ASSERTIONS=OFF"
 
-# ====================== Choose and run build script ======================
+# ====================== 6. Choose and run build script ======================
 if [[ "$FILC_LIBC" == "musl" ]]; then
     BUILD_SCRIPT="build_all_fast_musl.sh"
 else
