@@ -4,6 +4,8 @@
 
 This repository provides reusable scripts to inject Fil-C into a clean environment.
 
+It contains mostly AI generated scripts and readme, but human generated patches.
+
 ### Important Safety Warning
 
 > **⚠️ This bootstrap is experimental and potentially destructive.**
